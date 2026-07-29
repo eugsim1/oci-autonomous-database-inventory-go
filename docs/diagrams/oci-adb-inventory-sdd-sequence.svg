@@ -1,76 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1654" height="1050" viewBox="0 0 1654 1050" role="img" aria-labelledby="title desc">
-  <title id="title">Software design sequence for OCI Autonomous Database Inventory</title>
-  <desc id="desc">Sequence from operator invocation through provider selection, region discovery, Search pagination, Database API lookups, normalization, and atomic report writing.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1650" height="1180" viewBox="0 0 1650 1180">
   <defs>
-    <marker id="arrBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#41729F"/></marker>
-    <marker id="arrRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#C74634"/></marker>
-    <marker id="arrGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#8B7E74"/></marker>
-    <marker id="arrGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3F7D5A"/></marker>
     <style>
-      text { font-family: Arial, sans-serif; fill: #161513; }
-      .h1 { font-size: 27px; font-weight: 700; }
-      .sub { font-size: 15px; fill: #5b5652; }
-      .participant { font-size: 13px; font-weight: 700; text-anchor: middle; }
-      .life { stroke-width: 1.4; stroke-dasharray: 7 7; }
-      .msg { stroke-width: 2.2; fill: none; }
-      .ret { stroke-width: 1.6; stroke-dasharray: 7 5; fill: none; }
-      .label { font-size: 12px; font-weight: 600; paint-order: stroke; stroke: white; stroke-width: 5; stroke-linejoin: round; }
-      .loop-label { font-size: 12px; font-weight: 700; }
+      .title{font:700 27px Arial,sans-serif;fill:#161513}.sub{font:15px Arial,sans-serif;fill:#5b5652}
+      .p{font:700 13px Arial,sans-serif;fill:#161513}.msg{font:12px Arial,sans-serif;fill:#302d2a}
+      .loop{font:700 12px Arial,sans-serif;fill:#5b5652}.note{font:13px Arial,sans-serif;fill:#302d2a}
+      .life{stroke:#a9a19b;stroke-width:1;stroke-dasharray:6 6}.call{stroke:#c74634;stroke-width:2;fill:none}
+      .search{stroke:#41729f;stroke-width:2;fill:none}.ret{stroke:#8b7e74;stroke-width:1.5;stroke-dasharray:6 4;fill:none}
     </style>
+    <marker id="red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0L0,6L9,3z" fill="#c74634"/></marker>
+    <marker id="blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0L0,6L9,3z" fill="#41729f"/></marker>
+    <marker id="gray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0L0,6L9,3z" fill="#8b7e74"/></marker>
+    <marker id="green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0L0,6L9,3z" fill="#3f7d5a"/></marker>
   </defs>
-  <rect width="1654" height="1050" fill="#fff"/>
-  <text class="h1" x="45" y="58">Software Design Sequence — OCI Autonomous Database Inventory</text>
-  <text class="sub" x="45" y="87">Bounded, read-only collection with partial-error reporting and deterministic output</text>
+  <rect width="1650" height="1180" fill="#fff"/>
+  <text x="35" y="48" class="title">Software Design Sequence - OCI Database, Compute, and Volume Inventory</text>
+  <text x="35" y="78" class="sub">Bounded read-only collection, exact attached-storage sizes, Oracle-Tags age calculation, and explicit partial errors</text>
 
   <g>
-    <rect x="35" y="115" width="155" height="55" rx="9" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/><text class="participant" x="112" y="148">Operator / Scheduler</text>
-    <rect x="225" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="302" y="148">Go CLI</text>
-    <rect x="415" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="492" y="148">Auth provider</text>
-    <rect x="605" y="115" width="155" height="55" rx="9" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/><text class="participant" x="682" y="148">OCI Identity</text>
-    <rect x="795" y="115" width="155" height="55" rx="9" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/><text class="participant" x="872" y="148">OCI Search</text>
-    <rect x="985" y="115" width="155" height="55" rx="9" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/><text class="participant" x="1062" y="148">Database API</text>
-    <rect x="1175" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="1252" y="148">Normalizer</text>
-    <rect x="1365" y="115" width="155" height="55" rx="9" fill="#E5F2EA" stroke="#3F7D5A" stroke-width="2"/><text class="participant" x="1442" y="148">Report writer</text>
+    <rect x="20" y="110" width="130" height="50" rx="9" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/><text x="85" y="141" text-anchor="middle" class="p">Operator</text>
+    <rect x="190" y="110" width="130" height="50" rx="9" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/><text x="255" y="141" text-anchor="middle" class="p">Go CLI</text>
+    <rect x="360" y="110" width="130" height="50" rx="9" fill="#f9e5de" stroke="#c74634" stroke-width="2"/><text x="425" y="141" text-anchor="middle" class="p">Identity</text>
+    <rect x="530" y="110" width="130" height="50" rx="9" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/><text x="595" y="141" text-anchor="middle" class="p">Search</text>
+    <rect x="700" y="110" width="135" height="50" rx="9" fill="#f9e5de" stroke="#c74634" stroke-width="2"/><text x="767" y="141" text-anchor="middle" class="p">Database API</text>
+    <rect x="875" y="110" width="135" height="50" rx="9" fill="#f9e5de" stroke="#c74634" stroke-width="2"/><text x="942" y="141" text-anchor="middle" class="p">Compute API</text>
+    <rect x="1050" y="110" width="145" height="50" rx="9" fill="#f9e5de" stroke="#c74634" stroke-width="2"/><text x="1122" y="141" text-anchor="middle" class="p">Block Volume</text>
+    <rect x="1235" y="110" width="135" height="50" rx="9" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/><text x="1302" y="141" text-anchor="middle" class="p">Normalizer</text>
+    <rect x="1410" y="110" width="145" height="50" rx="9" fill="#e5f2ea" stroke="#3f7d5a" stroke-width="2"/><text x="1482" y="141" text-anchor="middle" class="p">Report writer</text>
+  </g>
+  <g>
+    <line x1="85" y1="160" x2="85" y2="1080" class="life"/><line x1="255" y1="160" x2="255" y2="1080" class="life"/>
+    <line x1="425" y1="160" x2="425" y2="1080" class="life"/><line x1="595" y1="160" x2="595" y2="1080" class="life"/>
+    <line x1="767" y1="160" x2="767" y2="1080" class="life"/><line x1="942" y1="160" x2="942" y2="1080" class="life"/>
+    <line x1="1122" y1="160" x2="1122" y2="1080" class="life"/><line x1="1302" y1="160" x2="1302" y2="1080" class="life"/>
+    <line x1="1482" y1="160" x2="1482" y2="1080" class="life"/>
   </g>
 
-  <line class="life" x1="112" y1="170" x2="112" y2="885" stroke="#41729F"/>
-  <line class="life" x1="302" y1="170" x2="302" y2="885" stroke="#8B7E74"/>
-  <line class="life" x1="492" y1="170" x2="492" y2="885" stroke="#8B7E74"/>
-  <line class="life" x1="682" y1="170" x2="682" y2="885" stroke="#C74634"/>
-  <line class="life" x1="872" y1="170" x2="872" y2="885" stroke="#41729F"/>
-  <line class="life" x1="1062" y1="170" x2="1062" y2="885" stroke="#C74634"/>
-  <line class="life" x1="1252" y1="170" x2="1252" y2="885" stroke="#8B7E74"/>
-  <line class="life" x1="1442" y1="170" x2="1442" y2="885" stroke="#3F7D5A"/>
+  <line x1="85" y1="200" x2="255" y2="200" class="search" marker-end="url(#blue)"/><text x="170" y="191" text-anchor="middle" class="msg">1 run(flags)</text>
+  <line x1="255" y1="242" x2="425" y2="242" class="call" marker-end="url(#red)"/><text x="340" y="233" text-anchor="middle" class="msg">2 ListRegionSubscriptions</text>
+  <line x1="425" y1="282" x2="255" y2="282" class="ret" marker-end="url(#gray)"/><text x="340" y="273" text-anchor="middle" class="msg">3 READY regions</text>
 
-  <line class="msg" x1="112" y1="205" x2="302" y2="205" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="153" y="195">1 run(flags)</text>
-  <line class="msg" x1="302" y1="245" x2="492" y2="245" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="343" y="235">2 select provider</text>
-  <line class="ret" x1="492" y1="280" x2="302" y2="280" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="335" y="270">3 provider + tenancy OCID</text>
-  <line class="msg" x1="302" y1="320" x2="682" y2="320" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="380" y="310">4 ListRegionSubscriptions(tenancy)</text>
-  <line class="ret" x1="682" y1="355" x2="302" y2="355" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="421" y="345">5 READY subscriptions</text>
+  <rect x="210" y="315" width="955" height="570" fill="none" stroke="#c74634" stroke-dasharray="7 6"/>
+  <rect x="210" y="315" width="300" height="27" fill="#fff7f2" stroke="#c74634"/>
+  <text x="225" y="334" class="loop">loop each READY region (bounded workers)</text>
 
-  <rect x="260" y="385" width="855" height="260" fill="#fff" fill-opacity=".55" stroke="#C74634" stroke-dasharray="8 6"/>
-  <path d="M260 385h365v25H260z" fill="#F9E5DE" stroke="#C74634"/>
-  <text class="loop-label" x="272" y="402">loop — each READY subscribed region (bounded workers)</text>
+  <line x1="255" y1="375" x2="595" y2="375" class="search" marker-end="url(#blue)"/><text x="425" y="366" text-anchor="middle" class="msg">4 SearchResources(two queries, all pages)</text>
+  <line x1="595" y1="415" x2="255" y2="415" class="ret" marker-end="url(#gray)"/><text x="425" y="406" text-anchor="middle" class="msg">5 Autonomous DB + instance OCIDs</text>
 
-  <rect x="275" y="420" width="635" height="95" fill="#fff" fill-opacity=".55" stroke="#41729F" stroke-dasharray="7 5"/>
-  <path d="M275 420h155v23H275z" fill="#E7F0F7" stroke="#41729F"/><text class="loop-label" x="286" y="436">loop — Search pages</text>
-  <line class="msg" x1="302" y1="458" x2="872" y2="458" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="403" y="450">6 SearchResources(query autonomousdatabase resources, page)</text>
-  <line class="ret" x1="872" y1="493" x2="302" y2="493" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="487" y="485">7 ResourceSummary[] + next page</text>
+  <rect x="225" y="445" width="575" height="115" fill="#fff" fill-opacity=".7" stroke="#41729f" stroke-dasharray="6 5"/>
+  <text x="240" y="465" class="loop">loop Autonomous Database OCIDs</text>
+  <line x1="255" y1="493" x2="767" y2="493" class="call" marker-end="url(#red)"/><text x="511" y="484" text-anchor="middle" class="msg">6 GetAutonomousDatabase</text>
+  <line x1="767" y1="535" x2="255" y2="535" class="ret" marker-end="url(#gray)"/><text x="511" y="526" text-anchor="middle" class="msg">7 complete AutonomousDatabase object</text>
 
-  <rect x="275" y="525" width="825" height="105" fill="#fff" fill-opacity=".55" stroke="#C74634" stroke-dasharray="7 5"/>
-  <path d="M275 525h290v23H275z" fill="#F9E5DE" stroke="#C74634"/><text class="loop-label" x="286" y="541">loop — discovered Autonomous Database OCIDs</text>
-  <line class="msg" x1="302" y1="560" x2="1062" y2="560" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="534" y="552">8 GetAutonomousDatabase(OCID)</text>
-  <line class="ret" x1="1062" y1="600" x2="302" y2="600" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="535" y="592">9 complete AutonomousDatabase SDK object</text>
+  <rect x="225" y="580" width="915" height="285" fill="#fff" fill-opacity=".7" stroke="#c74634" stroke-dasharray="6 5"/>
+  <text x="240" y="600" class="loop">loop Compute instance OCIDs</text>
+  <line x1="255" y1="628" x2="942" y2="628" class="call" marker-end="url(#red)"/><text x="598" y="619" text-anchor="middle" class="msg">8 GetInstance</text>
+  <line x1="942" y1="665" x2="255" y2="665" class="ret" marker-end="url(#gray)"/><text x="598" y="656" text-anchor="middle" class="msg">9 complete Instance + Oracle-Tags</text>
+  <line x1="255" y1="707" x2="942" y2="707" class="call" marker-end="url(#red)"/><text x="598" y="698" text-anchor="middle" class="msg">10 ListBootVolumeAttachments + ListVolumeAttachments</text>
+  <line x1="942" y1="744" x2="255" y2="744" class="ret" marker-end="url(#gray)"/><text x="598" y="735" text-anchor="middle" class="msg">11 ATTACHED volume OCIDs + attachment objects</text>
+  <line x1="255" y1="787" x2="1122" y2="787" class="call" marker-end="url(#red)"/><text x="688" y="778" text-anchor="middle" class="msg">12 GetBootVolume / GetVolume</text>
+  <line x1="1122" y1="824" x2="255" y2="824" class="ret" marker-end="url(#gray)"/><text x="688" y="815" text-anchor="middle" class="msg">13 exact sizeInGBs + complete volume object</text>
+  <text x="688" y="851" text-anchor="middle" class="msg" fill="#8b6b16">On detail failure: retain attachment, size unknown, total incomplete</text>
 
-  <line class="msg" x1="302" y1="680" x2="1252" y2="680" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="655" y="671">10 derive ECPU/OCPU/storage summary</text>
-  <line class="ret" x1="1252" y1="720" x2="302" y2="720" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="666" y="711">11 sorted records + collection errors</text>
-  <line class="msg" x1="302" y1="760" x2="1442" y2="760" stroke="#3F7D5A" marker-end="url(#arrGreen)"/><text class="label" x="700" y="751">12 write JSON + CSV + Markdown</text>
-  <line class="ret" x1="1442" y1="800" x2="302" y2="800" stroke="#3F7D5A" marker-end="url(#arrGreen)"/><text class="label" x="714" y="791">13 atomic rename + report paths</text>
-  <line class="msg" x1="302" y1="845" x2="112" y2="845" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="116" y="835">14 counts, paths, exit status</text>
+  <line x1="255" y1="925" x2="1302" y2="925" class="search" marker-end="url(#blue)"/><text x="778" y="916" text-anchor="middle" class="msg">14 normalize CPU/storage; parse tags; calculate age days at generated_at</text>
+  <line x1="1302" y1="968" x2="255" y2="968" class="ret" marker-end="url(#gray)"/><text x="778" y="959" text-anchor="middle" class="msg">15 sorted schema v2 records + explicit errors</text>
+  <line x1="255" y1="1012" x2="1482" y2="1012" stroke="#3f7d5a" stroke-width="2" marker-end="url(#green)"/><text x="868" y="1003" text-anchor="middle" class="msg">16 write combined JSON + two CSV files + Markdown</text>
+  <line x1="1482" y1="1055" x2="85" y2="1055" stroke="#3f7d5a" stroke-width="2" marker-end="url(#green)"/><text x="783" y="1046" text-anchor="middle" class="msg">17 atomic report paths + counts + strict-mode status</text>
 
-  <path d="M510 910h670v90H510z" fill="#FFF8DF" stroke="#D6B656"/>
-  <path d="M1150 910l30 30h-30z" fill="#F1D98A" stroke="#D6B656"/>
-  <text x="530" y="938" font-size="13" font-weight="700">Partial failure contract</text>
-  <text x="530" y="963" font-size="13">Regional Search and per-resource Database API errors are retained in the report.</text>
-  <text x="530" y="985" font-size="13">With --strict, the partial report is written before a non-zero exit.</text>
+  <rect x="395" y="1100" width="850" height="60" rx="8" fill="#fff8df" stroke="#d6b656"/>
+  <text x="415" y="1124" class="p">Partial failure contract</text>
+  <text x="415" y="1147" class="note">Independent errors stay in the report. Volume-detail failures cannot silently understate a total. Strict mode writes partial output before returning non-zero.</text>
 </svg>

@@ -13,7 +13,7 @@ import (
 	"github.com/eugsim1/oci-autonomous-database-inventory-go/internal/report"
 )
 
-var version = "1.0.0"
+var version = "2.0.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -53,9 +53,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "Autonomous Databases: %d\n", inventory.DatabaseCount)
+	fmt.Fprintf(stdout, "Compute instances: %d\n", inventory.ComputeInstanceCount)
+	fmt.Fprintf(stdout, "Attached boot volumes: %d\n", inventory.BootVolumeCount)
+	fmt.Fprintf(stdout, "Attached block volumes: %d\n", inventory.BlockVolumeCount)
 	fmt.Fprintf(stdout, "Collection errors: %d\n", inventory.ErrorCount)
 	fmt.Fprintf(stdout, "JSON: %s\n", paths.JSON)
-	fmt.Fprintf(stdout, "CSV: %s\n", paths.CSV)
+	fmt.Fprintf(stdout, "Autonomous Database CSV: %s\n", paths.AutonomousDatabaseCSV)
+	fmt.Fprintf(stdout, "Compute instance CSV: %s\n", paths.ComputeInstanceCSV)
 	fmt.Fprintf(stdout, "Markdown: %s\n", paths.Markdown)
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {

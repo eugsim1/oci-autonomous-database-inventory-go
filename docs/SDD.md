@@ -1,88 +1,209 @@
-# Software design description
+# Software Design Description
 
-## Purpose
+## 1. Purpose
 
-`oci-adb-inventory` creates a point-in-time, tenancy-wide configuration
-inventory of Autonomous Databases visible to an authenticated OCI principal.
-It deliberately uses OCI Resource Search for discovery and the Database
-Service `GetAutonomousDatabase` operation for authoritative per-resource
-details.
+This utility produces a read-only, point-in-time tenancy inventory of:
 
-## Context
+1. Autonomous Databases and their full Database Service configuration.
+2. Compute instances and their full Compute Service configuration.
+3. Boot and block volumes currently attached to each Compute instance.
+4. Creation audit fields sourced from `Oracle-Tags`.
 
-The process is read-only:
+The collector scans all `READY` subscribed OCI regions unless the operator
+provides an explicit subset.
 
-1. Select an OCI SDK configuration provider.
-2. Resolve the tenancy OCID from the provider unless explicitly supplied.
-3. Call Identity `ListRegionSubscriptions`.
-4. Keep every `READY` subscription, or validate an explicit region subset.
-5. In each selected region, paginate the structured Search query
-   `query autonomousdatabase resources`.
-6. De-duplicate Search results by `(region, OCID)`.
-7. Run bounded-concurrent `GetAutonomousDatabase` requests against the
-   Database Service endpoint in the resource's region.
-8. Preserve the complete SDK object and derive a stable flat summary.
-9. Sort results and atomically write timestamped JSON, CSV, and Markdown.
+## 2. Design goals
 
-## Components
+- Use OCI Search for tenancy-wide, region-scoped discovery.
+- Use authoritative service APIs for configuration and storage sizes.
+- Preserve complete SDK responses in canonical JSON.
+- Make `Oracle-Tags.CreatedOn` provenance explicit and independently auditable.
+- Never present a partial storage total as complete.
+- Continue across independent failures and make every error visible.
+- Bound concurrency and total runtime.
+- Write deterministic timestamped reports without partially published files.
 
-| Component | Responsibility |
-|---|---|
-| CLI/config | Validate flags, authentication mode, region filter, concurrency, timeout, and output directory. |
-| Provider factory | Construct API-key, instance-principal, or resource-principal SDK configuration. |
-| Region discovery | Retrieve tenancy subscriptions and select only `READY` regions. |
-| Search workers | Execute and paginate the structured resource query in each region. |
-| Database workers | Resolve every discovered OCID with `GetAutonomousDatabase`. |
-| Normalizer | Map `computeModel`/`computeCount` to explicit ECPU or OCPU summary fields and retain exact GB/TB storage fields. |
-| Report writer | Write deterministic full-detail JSON, flat CSV, and reader-friendly Markdown. |
+## 3. Components
 
-## Data model
+### CLI and configuration
 
-The JSON report is the canonical artifact. Each database record contains:
+`cmd/oci-adb-inventory` parses authentication, profile, region selection,
+worker count, timeout, strict mode, and output path. It owns the process exit
+contract.
 
-- `summary`: stable, normalized fields intended for reporting and automation;
-- `configuration`: the complete `database.AutonomousDatabase` object returned
-  by the pinned OCI Go SDK.
+### Authentication provider
 
-The summary does not invent a CPU conversion. When `computeModel` is `ECPU`,
-`computeCount` is reported as ECPUs. When it is `OCPU`, it is reported as
-OCPUs. Legacy `cpuCoreCount` remains a separate field.
+`internal/oci/provider.go` selects one OCI SDK configuration provider:
 
-Storage is preserved in the unit returned by OCI. A normalized GiB value is
-also provided for aggregation: an exact `dataStorageSizeInGBs` value takes
-precedence; otherwise `dataStorageSizeInTBs × 1024` is used.
+- API signing key;
+- Compute instance principal;
+- resource principal.
 
-## Concurrency and ordering
+The tenancy OCID comes from `--tenancy-id` or the provider.
 
-The `--workers` limit applies independently to region Search calls and
-database-detail calls. OCI clients are cached by region. The OCI SDK default
-retry policy is attached to every API request. Final database and error
-records are sorted, so concurrent collection does not make reports unstable.
+### Region discovery
 
-## Error handling
+The Identity client calls `ListRegionSubscriptions`. Only subscriptions in
+`READY` state are scanned. User-requested regions are validated against that
+set.
 
-Failure to authenticate or list region subscriptions is fatal. A failure in
-one regional Search or one database lookup is recorded in the report while
-other work continues. `--strict` writes the partial report and then returns a
-non-zero exit status when any collection error occurred.
+### Resource discovery
 
-An overall context timeout bounds the run. Generated files are written through
-temporary files in the destination directory and renamed only after a
-successful close.
+Each selected region receives two fully paginated Search requests:
 
-## Security
+```text
+query autonomousdatabase resources
+query instance resources
+```
 
-The tool never creates, updates, starts, stops, or deletes OCI resources. It
-does not print private keys or tokens. Full JSON can still contain sensitive
-operational metadata such as OCIDs, endpoints, network ACLs, tags, and
-customer-contact details. The default `reports/` directory is excluded from
-Git.
+Results are de-duplicated by `(region, OCID)`. Search is used only to discover
+resource identifiers.
 
-## Diagrams
+### Autonomous Database enrichment
 
-- [Editable OCI architecture](diagrams/oci-adb-inventory-architecture.drawio)
-- [Editable sequence/SDD diagram](diagrams/oci-adb-inventory-sdd-sequence.drawio)
+The regional Database client calls `GetAutonomousDatabase` for each database
+OCID. The response is stored in full and normalized into stable CPU, storage,
+lifecycle, licensing, network, and Oracle tag audit fields.
 
-The architecture diagram uses an Autonomous Database service icon derived from
-Oracle's OCI Architecture Diagram Toolkit. Oracle and OCI marks remain the
-property of Oracle Corporation and/or its affiliates.
+### Compute enrichment
+
+The regional Compute client calls `GetInstance` for every discovered instance.
+The complete instance object is preserved. Shape configuration is normalized
+into OCPU, VCPU, memory, local-disk, and baseline-utilization fields.
+
+### Attached storage enrichment
+
+For each retrieved instance:
+
+1. `ListBootVolumeAttachments` uses the instance OCID, compartment, and
+   availability domain. Pagination is complete.
+2. Attachments not in `ATTACHED` state are excluded.
+3. `GetBootVolume` returns the authoritative boot-volume object and
+   `sizeInGBs`.
+4. `ListVolumeAttachments` uses the instance OCID and compartment. Pagination
+   is complete.
+5. Data-volume attachments not in `ATTACHED` state are excluded.
+6. `GetVolume` returns the authoritative block-volume object and `sizeInGBs`.
+
+The attachment object and corresponding volume object are both retained.
+
+### Oracle tag audit
+
+The normalizer performs a case-insensitive lookup of the `Oracle-Tags`
+namespace and its `CreatedOn` and `CreatedBy` keys.
+
+`CreatedOn` handling:
+
+- preserve the original value;
+- parse RFC3339/RFC3339Nano;
+- normalize valid values to UTC;
+- calculate complete elapsed 24-hour periods at `report.generated_at`;
+- label the value `parsed`, `missing`, `invalid`, or `unavailable` when a
+  volume detail call failed.
+
+OCI `timeCreated` is stored separately. It is never used as a silent fallback
+for the requested tag-derived age.
+
+### Report writer
+
+The writer creates four files with one shared UTC timestamp:
+
+- canonical combined JSON;
+- Autonomous Database CSV;
+- Compute/attached-volume CSV;
+- Markdown summary.
+
+Each file is written with restricted permissions to a temporary file in the
+destination directory and then atomically renamed.
+
+## 4. Concurrency model
+
+The configured worker count bounds:
+
+- concurrent regional Search calls;
+- concurrent Autonomous Database detail calls;
+- concurrent Compute instance enrichment tasks.
+
+Within one Compute task, attachment pages and volume details are retrieved in a
+deterministic sequence. Independent instances still run concurrently. SDK
+clients are cached per region and protected during cache creation.
+
+The root context applies the configured timeout to the complete operation.
+
+## 5. Data model
+
+The JSON schema version is `2.0`.
+
+`Report` contains:
+
+- run metadata and authentication mode;
+- both exact Search queries;
+- region subscription state;
+- counts;
+- `DatabaseRecord[]`;
+- `ComputeInstanceRecord[]`;
+- `CollectionError[]`.
+
+Each `ComputeInstanceRecord` contains:
+
+- normalized `ComputeInstanceSummary`;
+- complete `core.Instance`;
+- `BootVolumeRecord[]`;
+- `BlockVolumeRecord[]`.
+
+Each volume record contains:
+
+- normalized exact size, tag audit, and attachment metadata;
+- complete attachment object;
+- complete `core.BootVolume` or `core.Volume`.
+
+Per-instance totals are pointers. A nil total means an attachment listing did
+not complete or at least one size is unknown. Separate boot/block inventory
+completeness flags identify list failures. `attached_storage_size_complete` is
+true only when both attachment listings completed and all discovered attached
+volumes have a size.
+
+## 6. Error contract
+
+The following failures are fatal before reports can be meaningfully produced:
+
+- configuration or authentication provider creation;
+- inability to resolve the tenancy;
+- inability to list region subscriptions;
+- invalid requested region selection.
+
+The following are retained as `CollectionError` values:
+
+- regional Search failure;
+- database or instance detail failure;
+- boot/block attachment list failure;
+- boot/block volume detail failure.
+
+When a volume-detail call fails, the attachment remains in JSON/CSV with an
+unknown size. In strict mode, partial reports are still written before the CLI
+returns a non-zero status.
+
+## 7. Security
+
+- The application invokes only read operations.
+- API private keys remain with the SDK configuration provider.
+- Reports are excluded from Git and use restricted permissions where supported.
+- Canonical JSON is sensitive because full instance metadata, tags, network
+  identifiers, endpoints, and database configuration are retained.
+- The recommended IAM policy grants `read instance-family` because
+  `GetInstance` needs `INSTANCE_READ`, and `inspect volume-family` for volume
+  and attachment inspection.
+
+## 8. Verification
+
+The project verification gate is:
+
+```text
+go test ./...
+go vet ./...
+go build -trimpath ./cmd/oci-adb-inventory
+```
+
+Unit tests cover region selection, ECPU/OCPU normalization, exact storage
+totals, Oracle tag parsing and age calculation, JSON preservation, both CSV
+formats, Markdown generation, and timestamped filenames.

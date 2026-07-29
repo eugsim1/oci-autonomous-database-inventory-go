@@ -13,7 +13,7 @@ and related marks are trademarks or registered trademarks of Oracle
 Corporation and/or its affiliates. Other names may be trademarks of their
 respective owners.
 
-The generated full-detail JSON report can contain OCIDs, network endpoints,
-access-control lists, tags, customer-contact metadata, and other tenancy
-configuration. Treat it as sensitive operational data and do not commit it to
-source control.
+The generated full-detail JSON report can contain OCIDs, Compute instance
+metadata, attached-volume details, network endpoints, access-control lists,
+tags, customer-contact metadata, and other tenancy configuration. Treat it as
+sensitive operational data and do not commit it to source control.

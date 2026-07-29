@@ -11,6 +11,7 @@ import (
 
 	"github.com/eugsim1/oci-autonomous-database-inventory-go/internal/model"
 	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/core"
 	"github.com/oracle/oci-go-sdk/v65/database"
 )
 
@@ -25,20 +26,74 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		ComputeModel:         database.AutonomousDatabaseComputeModelEcpu,
 		ComputeCount:         common.Float32(8),
 		DataStorageSizeInGBs: common.Int(1024),
+		DefinedTags: map[string]map[string]interface{}{
+			"Oracle-Tags": {
+				"CreatedOn": "2026-07-09T10:11:12Z",
+				"CreatedBy": "database-admin@example.com",
+			},
+		},
 	}
 	report := model.Report{
-		SchemaVersion:  "1.0",
+		SchemaVersion:  "2.0",
 		GeneratedAt:    generated,
 		TenancyOCID:    "ocid1.tenancy.oc1..example",
 		Authentication: "api_key",
-		SearchQuery:    model.SearchQuery,
+		SearchQueries: map[string]string{
+			"autonomous_databases": model.AutonomousDatabaseSearchQuery,
+			"compute_instances":    model.ComputeInstanceSearchQuery,
+		},
 		SubscribedRegions: []model.Region{
 			{Name: "eu-paris-1", Status: "READY", Scanned: true},
 		},
 		Databases: []model.DatabaseRecord{{
-			Summary:       model.NewSummary("eu-paris-1", adb),
+			Summary:       model.NewSummaryAt("eu-paris-1", adb, generated),
 			Configuration: adb,
 		}},
+	}
+	instance := core.Instance{
+		Id:                 common.String("ocid1.instance.oc1.eu-paris-1.example"),
+		CompartmentId:      common.String("ocid1.compartment.oc1..example"),
+		DisplayName:        common.String("app-01"),
+		AvailabilityDomain: common.String("PARIS-AD-1"),
+		Shape:              common.String("VM.Standard.E5.Flex"),
+		LifecycleState:     core.InstanceLifecycleStateRunning,
+		DefinedTags: map[string]map[string]interface{}{
+			"Oracle-Tags": {
+				"CreatedOn": "2026-07-19T10:11:12Z",
+				"CreatedBy": "alice@example.com",
+			},
+		},
+	}
+	bootAttachment := core.BootVolumeAttachment{
+		Id:             common.String("ocid1.bootvolumeattachment.oc1.example"),
+		BootVolumeId:   common.String("ocid1.bootvolume.oc1.example"),
+		LifecycleState: core.BootVolumeAttachmentLifecycleStateAttached,
+	}
+	boot := model.NewBootVolumeRecord(bootAttachment, core.BootVolume{
+		Id:          common.String("ocid1.bootvolume.oc1.example"),
+		DisplayName: common.String("app-01 (Boot Volume)"),
+		SizeInGBs:   common.Int64(100),
+	}, generated)
+	blockAttachment := core.ParavirtualizedVolumeAttachment{
+		Id:             common.String("ocid1.volumeattachment.oc1.example"),
+		VolumeId:       common.String("ocid1.volume.oc1.example"),
+		LifecycleState: core.VolumeAttachmentLifecycleStateAttached,
+	}
+	block := model.NewBlockVolumeRecord(blockAttachment, core.Volume{
+		Id:          common.String("ocid1.volume.oc1.example"),
+		DisplayName: common.String("app-data"),
+		SizeInGBs:   common.Int64(250),
+	}, generated)
+	report.ComputeInstances = []model.ComputeInstanceRecord{
+		model.NewComputeInstanceRecord(
+			"eu-paris-1",
+			instance,
+			[]model.BootVolumeRecord{boot},
+			[]model.BlockVolumeRecord{block},
+			true,
+			true,
+			generated,
+		),
 	}
 	report.Finalize()
 
@@ -46,7 +101,12 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write() error = %v", err)
 	}
-	for _, path := range []string{paths.JSON, paths.CSV, paths.Markdown} {
+	for _, path := range []string{
+		paths.JSON,
+		paths.AutonomousDatabaseCSV,
+		paths.ComputeInstanceCSV,
+		paths.Markdown,
+	} {
 		if !strings.Contains(filepath.Base(path), "20260729T101112Z") {
 			t.Fatalf("path %q does not contain the UTC timestamp", path)
 		}
@@ -69,8 +129,14 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if configuration["computeModel"] != "ECPU" {
 		t.Fatalf("full configuration computeModel = %v", configuration["computeModel"])
 	}
+	instances := decoded["compute_instances"].([]interface{})
+	computeRecord := instances[0].(map[string]interface{})
+	computeConfiguration := computeRecord["configuration"].(map[string]interface{})
+	if computeConfiguration["shape"] != "VM.Standard.E5.Flex" {
+		t.Fatalf("full Compute configuration shape = %v", computeConfiguration["shape"])
+	}
 
-	csvFile, err := os.Open(paths.CSV)
+	csvFile, err := os.Open(paths.AutonomousDatabaseCSV)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,6 +146,36 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		t.Fatalf("invalid CSV: %v", err)
 	}
 	if len(rows) != 2 {
-		t.Fatalf("CSV rows = %d, want 2", len(rows))
+		t.Fatalf("Autonomous Database CSV rows = %d, want 2", len(rows))
+	}
+	if len(rows[1]) != len(rows[0]) {
+		t.Fatalf("Autonomous Database CSV row has %d columns, header has %d",
+			len(rows[1]), len(rows[0]))
+	}
+	if !strings.Contains(strings.Join(rows[1], ","), "database-admin@example.com") {
+		t.Fatalf("Autonomous Database CSV does not contain Oracle-Tags.CreatedBy: %#v", rows[1])
+	}
+
+	computeCSVFile, err := os.Open(paths.ComputeInstanceCSV)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer computeCSVFile.Close()
+	computeRows, err := csv.NewReader(computeCSVFile).ReadAll()
+	if err != nil {
+		t.Fatalf("invalid Compute CSV: %v", err)
+	}
+	if len(computeRows) != 3 {
+		t.Fatalf("Compute CSV rows = %d, want 3", len(computeRows))
+	}
+	for index, row := range computeRows[1:] {
+		if len(row) != len(computeRows[0]) {
+			t.Fatalf("Compute CSV row %d has %d columns, header has %d",
+				index+1, len(row), len(computeRows[0]))
+		}
+	}
+	if !strings.Contains(strings.Join(computeRows[1], ","), "100") ||
+		!strings.Contains(strings.Join(computeRows[2], ","), "250") {
+		t.Fatalf("Compute CSV does not contain exact boot and block volume sizes: %#v", computeRows)
 	}
 }

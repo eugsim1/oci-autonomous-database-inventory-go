@@ -2,8 +2,10 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	"github.com/oracle/oci-go-sdk/v65/common"
+	"github.com/oracle/oci-go-sdk/v65/core"
 	"github.com/oracle/oci-go-sdk/v65/database"
 )
 
@@ -26,6 +28,109 @@ func TestNewSummaryECPUAndGBStorage(t *testing.T) {
 	}
 	if got.NormalizedDataStorageSizeInGBs == nil || *got.NormalizedDataStorageSizeInGBs != 512 {
 		t.Fatalf("NormalizedDataStorageSizeInGBs = %v, want 512", got.NormalizedDataStorageSizeInGBs)
+	}
+}
+
+func TestOracleTagAuditUsesCreatedOnAndCreatedBy(t *testing.T) {
+	asOf := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
+	tags := map[string]map[string]interface{}{
+		"Oracle-Tags": {
+			"CreatedOn": "2026-07-19T11:00:00Z",
+			"CreatedBy": "alice@example.com",
+		},
+	}
+	got := NewOracleTagAudit(tags, asOf)
+	if got.CreatedOnTagStatus != "parsed" {
+		t.Fatalf("CreatedOnTagStatus = %q, want parsed", got.CreatedOnTagStatus)
+	}
+	if got.CreatedOnUTC != "2026-07-19T11:00:00Z" {
+		t.Fatalf("CreatedOnUTC = %q", got.CreatedOnUTC)
+	}
+	if got.AgeDaysAsOfReport == nil || *got.AgeDaysAsOfReport != 10 {
+		t.Fatalf("AgeDaysAsOfReport = %v, want 10", got.AgeDaysAsOfReport)
+	}
+	if got.CreatedBy != "alice@example.com" {
+		t.Fatalf("CreatedBy = %q", got.CreatedBy)
+	}
+}
+
+func TestOracleTagAuditReportsInvalidCreatedOn(t *testing.T) {
+	got := NewOracleTagAudit(map[string]map[string]interface{}{
+		"oracle-tags": {
+			"createdon": "not-a-date",
+		},
+	}, time.Now())
+	if got.CreatedOnTagStatus != "invalid" {
+		t.Fatalf("CreatedOnTagStatus = %q, want invalid", got.CreatedOnTagStatus)
+	}
+	if got.AgeDaysAsOfReport != nil {
+		t.Fatalf("AgeDaysAsOfReport = %v, want nil", got.AgeDaysAsOfReport)
+	}
+}
+
+func TestComputeInstanceSummaryTotalsAttachedStorage(t *testing.T) {
+	asOf := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
+	instance := core.Instance{
+		Id:                 common.String("ocid1.instance.oc1.eu-paris-1.example"),
+		CompartmentId:      common.String("ocid1.compartment.oc1..example"),
+		DisplayName:        common.String("app-01"),
+		AvailabilityDomain: common.String("PARIS-AD-1"),
+		Shape:              common.String("VM.Standard.E5.Flex"),
+		ShapeConfig: &core.InstanceShapeConfig{
+			Ocpus:       common.Float32(4),
+			MemoryInGBs: common.Float32(64),
+		},
+	}
+	bootAttachment := core.BootVolumeAttachment{
+		Id:           common.String("ocid1.bootvolumeattachment.oc1.example"),
+		BootVolumeId: common.String("ocid1.bootvolume.oc1.example"),
+	}
+	boot := NewBootVolumeRecord(bootAttachment, core.BootVolume{
+		Id:        common.String("ocid1.bootvolume.oc1.example"),
+		SizeInGBs: common.Int64(100),
+	}, asOf)
+	blockAttachment := core.ParavirtualizedVolumeAttachment{
+		Id:       common.String("ocid1.volumeattachment.oc1.example"),
+		VolumeId: common.String("ocid1.volume.oc1.example"),
+	}
+	block := NewBlockVolumeRecord(blockAttachment, core.Volume{
+		Id:        common.String("ocid1.volume.oc1.example"),
+		SizeInGBs: common.Int64(250),
+	}, asOf)
+
+	got := NewComputeInstanceRecord(
+		"eu-paris-1",
+		instance,
+		[]BootVolumeRecord{boot},
+		[]BlockVolumeRecord{block},
+		true,
+		true,
+		asOf,
+	)
+	if got.Summary.AttachedStorageTotalSizeInGBs == nil ||
+		*got.Summary.AttachedStorageTotalSizeInGBs != 350 {
+		t.Fatalf("AttachedStorageTotalSizeInGBs = %v, want 350", got.Summary.AttachedStorageTotalSizeInGBs)
+	}
+	if !got.Summary.AttachedStorageSizeComplete {
+		t.Fatal("AttachedStorageSizeComplete = false, want true")
+	}
+}
+
+func TestComputeInstanceSummaryDoesNotClaimCompleteStorageAfterListFailure(t *testing.T) {
+	got := NewComputeInstanceRecord(
+		"eu-paris-1",
+		core.Instance{Id: common.String("ocid1.instance.oc1.eu-paris-1.example")},
+		nil,
+		nil,
+		false,
+		true,
+		time.Now(),
+	)
+	if got.Summary.BootVolumeTotalSizeInGBs != nil {
+		t.Fatalf("BootVolumeTotalSizeInGBs = %v, want nil", got.Summary.BootVolumeTotalSizeInGBs)
+	}
+	if got.Summary.AttachedStorageSizeComplete {
+		t.Fatal("AttachedStorageSizeComplete = true after boot attachment list failure")
 	}
 }
 

@@ -1,103 +1,121 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1654" height="930" viewBox="0 0 1654 930" role="img" aria-labelledby="title desc">
-  <title id="title">OCI Autonomous Database Configuration Inventory architecture</title>
-  <desc id="desc">Read-only multi-region discovery using Identity region subscriptions, OCI Resource Search, Database GetAutonomousDatabase, normalization, and timestamped reports.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
   <defs>
-    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#41729F"/></marker>
-    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#C74634"/></marker>
-    <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#8B7E74"/></marker>
-    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#3F7D5A"/></marker>
     <style>
-      text { font-family: Arial, sans-serif; fill: #161513; }
-      .h1 { font-size: 28px; font-weight: 700; }
-      .sub { font-size: 15px; fill: #5b5652; }
-      .box-title { font-size: 15px; font-weight: 700; text-anchor: middle; }
-      .body { font-size: 13px; text-anchor: middle; }
-      .edge { fill: none; stroke-width: 2.5; }
-      .edge-label { font-size: 12px; font-weight: 600; paint-order: stroke; stroke: white; stroke-width: 5; stroke-linejoin: round; }
-      .section { font-size: 16px; font-weight: 700; }
+      .title{font:700 30px Arial,sans-serif;fill:#161513}.sub{font:15px Arial,sans-serif;fill:#5b5652}
+      .h{font:700 15px Arial,sans-serif;fill:#161513}.t{font:13px Arial,sans-serif;fill:#302d2a}
+      .lane{font:700 13px Arial,sans-serif;fill:#5b5652;letter-spacing:.5px}
+      .small{font:12px Arial,sans-serif;fill:#5b5652}.edge{fill:none;stroke-width:2.2}
     </style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#41729f"/></marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#c74634"/></marker>
+    <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#8b7e74"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3f7d5a"/></marker>
   </defs>
-  <rect width="1654" height="930" fill="#fff"/>
-  <text class="h1" x="50" y="58">OCI Autonomous Database Configuration Inventory</text>
-  <text class="sub" x="50" y="88">Read-only, tenancy-wide, multi-region discovery with complete Database API enrichment</text>
+  <rect width="1600" height="1000" fill="#fff"/>
+  <text x="48" y="53" class="title">OCI Autonomous Database + Compute Inventory</text>
+  <text x="48" y="83" class="sub">Read-only, tenancy-wide, multi-region discovery with authoritative Database, Compute, and Block Volume enrichment</text>
 
-  <rect x="590" y="110" width="990" height="610" rx="16" fill="#FFF7F2" stroke="#C74634" stroke-width="3"/>
-  <rect x="590" y="110" width="990" height="45" rx="16" fill="#F9E5DE"/>
-  <path d="M590 155 H1580" stroke="#C74634" stroke-width="2"/>
-  <text class="section" x="615" y="140" fill="#C74634">OCI TENANCY</text>
+  <rect x="45" y="145" width="205" height="105" rx="12" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/>
+  <text x="147" y="180" text-anchor="middle" class="h">Operator / Scheduler</text>
+  <text x="147" y="207" text-anchor="middle" class="t">CLI, cron, CI</text>
+  <text x="147" y="229" text-anchor="middle" class="t">or OCI runtime</text>
 
-  <rect x="50" y="170" width="210" height="105" rx="12" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/>
-  <text class="box-title" x="155" y="198">Operator / Scheduler</text>
-  <text class="body" x="155" y="229"><tspan x="155">CLI, cron, CI,</tspan><tspan x="155" dy="20">or OCI runtime</tspan></text>
+  <rect x="295" y="132" width="220" height="132" rx="12" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
+  <text x="405" y="165" text-anchor="middle" class="h">OCI SDK authentication</text>
+  <text x="405" y="191" text-anchor="middle" class="t">API signing key</text>
+  <text x="405" y="213" text-anchor="middle" class="t">Instance principal</text>
+  <text x="405" y="235" text-anchor="middle" class="t">Resource principal</text>
 
-  <rect x="320" y="145" width="220" height="150" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
-  <text class="box-title" x="430" y="176">OCI SDK auth provider</text>
-  <text class="body" x="430" y="208"><tspan x="430">API signing key</tspan><tspan x="430" dy="20">Instance principal</tspan><tspan x="430" dy="20">Resource principal</tspan></text>
+  <rect x="565" y="108" width="990" height="682" rx="14" fill="#fff7f2" stroke="#c74634" stroke-width="3"/>
+  <rect x="565" y="108" width="990" height="42" rx="14" fill="#f9e5de"/>
+  <text x="590" y="136" class="h" fill="#c74634">OCI TENANCY</text>
 
-  <rect x="645" y="175" width="220" height="105" rx="12" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/>
-  <text class="box-title" x="755" y="203">Identity Service</text>
-  <text class="body" x="755" y="233"><tspan x="755">ListRegionSubscriptions</tspan><tspan x="755" dy="20">TENANCY_INSPECT</tspan></text>
+  <rect x="615" y="174" width="205" height="88" rx="10" fill="#f9e5de" stroke="#c74634" stroke-width="2"/>
+  <text x="717" y="207" text-anchor="middle" class="h">Identity</text>
+  <text x="717" y="233" text-anchor="middle" class="t">ListRegionSubscriptions</text>
+  <rect x="875" y="174" width="235" height="88" rx="10" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
+  <text x="992" y="207" text-anchor="middle" class="h">READY-region workers</text>
+  <text x="992" y="233" text-anchor="middle" class="t">Bounded concurrency + retries</text>
+  <rect x="1165" y="160" width="340" height="116" rx="10" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/>
+  <text x="1335" y="191" text-anchor="middle" class="h">OCI Resource Search</text>
+  <text x="1335" y="216" text-anchor="middle" class="t">query autonomousdatabase resources</text>
+  <text x="1335" y="238" text-anchor="middle" class="t">query instance resources</text>
+  <text x="1335" y="260" text-anchor="middle" class="small">full pagination in every READY region</text>
 
-  <rect x="955" y="175" width="220" height="105" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
-  <text class="box-title" x="1065" y="203">READY-region fan-out</text>
-  <text class="body" x="1065" y="233"><tspan x="1065">Bounded worker pool</tspan><tspan x="1065" dy="20">SDK retry policy</tspan></text>
+  <rect x="615" y="315" width="890" height="160" rx="10" fill="#fff" stroke="#d6cfc8" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="638" y="342" class="lane">AUTONOMOUS DATABASE PATH</text>
+  <rect x="665" y="365" width="235" height="82" rx="10" fill="#f9e5de" stroke="#c74634" stroke-width="2"/>
+  <text x="782" y="397" text-anchor="middle" class="h">Database Service API</text>
+  <text x="782" y="423" text-anchor="middle" class="t">GetAutonomousDatabase</text>
+  <rect x="990" y="352" width="235" height="108" rx="10" fill="#fff" stroke="#c74634" stroke-width="2"/>
+  <text x="1107" y="384" text-anchor="middle" class="h">Autonomous Database</text>
+  <text x="1107" y="408" text-anchor="middle" class="t">Complete SDK object</text>
+  <text x="1107" y="430" text-anchor="middle" class="t">ECPU / OCPU | GB / TB</text>
+  <rect x="1300" y="357" width="170" height="98" rx="10" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
+  <text x="1385" y="389" text-anchor="middle" class="h">DB summary</text>
+  <text x="1385" y="414" text-anchor="middle" class="t">Compute + storage</text>
+  <text x="1385" y="436" text-anchor="middle" class="t">State + network</text>
 
-  <rect x="680" y="325" width="850" height="325" rx="12" fill="#fff" stroke="#B7AEA7" stroke-width="2" stroke-dasharray="9 7"/>
-  <text x="705" y="355" font-size="14" font-weight="700" fill="#5b5652">FOR EACH READY SUBSCRIBED REGION</text>
+  <rect x="615" y="505" width="890" height="225" rx="10" fill="#fff" stroke="#d6cfc8" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="638" y="532" class="lane">COMPUTE + ATTACHED STORAGE PATH</text>
+  <rect x="645" y="565" width="220" height="118" rx="10" fill="#f9e5de" stroke="#c74634" stroke-width="2"/>
+  <text x="755" y="595" text-anchor="middle" class="h">Compute API</text>
+  <text x="755" y="619" text-anchor="middle" class="t">GetInstance</text>
+  <text x="755" y="641" text-anchor="middle" class="t">List boot attachments</text>
+  <text x="755" y="663" text-anchor="middle" class="t">List block attachments</text>
+  <rect x="905" y="555" width="225" height="138" rx="10" fill="#fff" stroke="#c74634" stroke-width="2"/>
+  <text x="1017" y="587" text-anchor="middle" class="h">Compute instance</text>
+  <text x="1017" y="613" text-anchor="middle" class="t">Shape / OCPU / memory</text>
+  <text x="1017" y="635" text-anchor="middle" class="t">Oracle-Tags.CreatedOn</text>
+  <text x="1017" y="657" text-anchor="middle" class="t">CreatedBy + age days</text>
+  <text x="1017" y="679" text-anchor="middle" class="small">ATTACHED volumes only</text>
+  <rect x="1165" y="570" width="175" height="108" rx="10" fill="#f9e5de" stroke="#c74634" stroke-width="2"/>
+  <text x="1252" y="602" text-anchor="middle" class="h">Block Volume API</text>
+  <text x="1252" y="630" text-anchor="middle" class="t">GetBootVolume</text>
+  <text x="1252" y="653" text-anchor="middle" class="t">GetVolume</text>
+  <ellipse cx="1420" cy="574" rx="61" ry="16" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/>
+  <path d="M1359 574v101c0 9 27 16 61 16s61-7 61-16V574" fill="#e7f0f7" stroke="#41729f" stroke-width="2"/>
+  <ellipse cx="1420" cy="675" rx="61" ry="16" fill="#d9e9f4" stroke="#41729f" stroke-width="2"/>
+  <text x="1420" y="609" text-anchor="middle" class="h">Attached</text>
+  <text x="1420" y="630" text-anchor="middle" class="h">volumes</text>
+  <text x="1420" y="652" text-anchor="middle" class="small">exact sizeInGBs</text>
 
-  <rect x="735" y="395" width="250" height="125" rx="12" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/>
-  <text class="box-title" x="860" y="424">OCI Resource Search</text>
-  <text class="body" x="860" y="453"><tspan x="860">query autonomousdatabase resources</tspan><tspan x="860" dy="23">Full pagination</tspan><tspan x="860" dy="19">(1,000 results per page)</tspan></text>
+  <rect x="295" y="355" width="265" height="158" rx="12" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
+  <text x="427" y="388" text-anchor="middle" class="h">Collector + normalizer</text>
+  <text x="427" y="415" text-anchor="middle" class="t">Complete SDK objects</text>
+  <text x="427" y="438" text-anchor="middle" class="t">Exact sizes and totals</text>
+  <text x="427" y="461" text-anchor="middle" class="t">Oracle-Tags age calculation</text>
+  <text x="427" y="484" text-anchor="middle" class="t">Explicit partial errors</text>
+  <rect x="295" y="570" width="265" height="130" rx="12" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
+  <text x="427" y="604" text-anchor="middle" class="h">Atomic report writer</text>
+  <text x="427" y="631" text-anchor="middle" class="t">Shared UTC timestamp</text>
+  <text x="427" y="654" text-anchor="middle" class="t">Restricted permissions</text>
+  <text x="427" y="677" text-anchor="middle" class="t">Temporary file + rename</text>
+  <rect x="45" y="565" width="205" height="145" rx="12" fill="#e5f2ea" stroke="#3f7d5a" stroke-width="2"/>
+  <text x="147" y="598" text-anchor="middle" class="h">Timestamped reports</text>
+  <text x="147" y="625" text-anchor="middle" class="t">Combined JSON</text>
+  <text x="147" y="647" text-anchor="middle" class="t">Autonomous DB CSV</text>
+  <text x="147" y="669" text-anchor="middle" class="t">Compute + volume CSV</text>
+  <text x="147" y="691" text-anchor="middle" class="t">Markdown summary</text>
 
-  <rect x="1045" y="395" width="240" height="125" rx="12" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/>
-  <text class="box-title" x="1165" y="424">Database Service API</text>
-  <text class="body" x="1165" y="453"><tspan x="1165">GetAutonomousDatabase</tspan><tspan x="1165" dy="23">Authoritative full</tspan><tspan x="1165" dy="19">configuration</tspan></text>
+  <path d="M250 198H295" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
+  <path d="M515 198H585V218H615" class="edge" stroke="#c74634" marker-end="url(#arrowRed)"/>
+  <path d="M820 218H875" class="edge" stroke="#8b7e74" marker-end="url(#arrowGray)"/>
+  <path d="M1110 218H1165" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
+  <path d="M1280 276V305H782V365" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
+  <path d="M1390 276V505H755V565" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
+  <path d="M900 406H990" class="edge" stroke="#c74634" marker-end="url(#arrowRed)"/>
+  <path d="M1225 406H1300" class="edge" stroke="#8b7e74" marker-end="url(#arrowGray)"/>
+  <path d="M865 624H905" class="edge" stroke="#c74634" marker-end="url(#arrowRed)"/>
+  <path d="M1130 624H1165" class="edge" stroke="#c74634" marker-end="url(#arrowRed)"/>
+  <path d="M1340 624H1359" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
+  <path d="M1300 447H580V420H560" class="edge" stroke="#8b7e74" marker-end="url(#arrowGray)"/>
+  <path d="M1359 690H590V490H560" class="edge" stroke="#8b7e74" marker-end="url(#arrowGray)"/>
+  <path d="M427 513V570" class="edge" stroke="#8b7e74" marker-end="url(#arrowGray)"/>
+  <path d="M295 635H250" class="edge" stroke="#3f7d5a" marker-end="url(#arrowGreen)"/>
 
-  <rect x="1340" y="375" width="145" height="165" rx="12" fill="#fff" stroke="#C74634" stroke-width="2"/>
-  <g transform="translate(1382 392)" stroke="#2D5967" stroke-width="3" fill="none">
-    <ellipse cx="31" cy="10" rx="28" ry="9" fill="#E7F0F7"/>
-    <path d="M3 10v40c0 6 13 10 28 10s28-4 28-10V10"/>
-    <path d="M3 30c0 6 13 10 28 10s28-4 28-10"/>
-    <circle cx="49" cy="51" r="13" fill="#fff"/>
-    <path d="M43 51l4 4 8-10" stroke="#C74634"/>
-  </g>
-  <text class="box-title" x="1412" y="475"><tspan x="1412">Autonomous</tspan><tspan x="1412" dy="18">Database</tspan></text>
-  <text class="body" x="1412" y="518">ECPU / OCPU • GB / TB</text>
-
-  <rect x="320" y="415" width="270" height="140" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
-  <text class="box-title" x="455" y="444">Collector + normalizer</text>
-  <text class="body" x="455" y="474"><tspan x="455">Preserve complete SDK object</tspan><tspan x="455" dy="21">Derive ECPU/OCPU/storage summary</tspan><tspan x="455" dy="21">Sort and record partial errors</tspan></text>
-
-  <rect x="320" y="620" width="270" height="125" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
-  <text class="box-title" x="455" y="649">Atomic report writer</text>
-  <text class="body" x="455" y="679"><tspan x="455">UTC timestamp • restricted permissions</tspan><tspan x="455" dy="22">Temporary file + rename</tspan></text>
-
-  <rect x="50" y="615" width="225" height="135" rx="12" fill="#E5F2EA" stroke="#3F7D5A" stroke-width="2"/>
-  <text class="box-title" x="162" y="644">Timestamped reports</text>
-  <text class="body" x="162" y="674"><tspan x="162">JSON — complete configuration</tspan><tspan x="162" dy="21">CSV — flat inventory</tspan><tspan x="162" dy="21">Markdown — regional summary</tspan></text>
-
-  <path class="edge" d="M260 222H320" stroke="#41729F" marker-end="url(#arrowBlue)"/>
-  <text class="edge-label" x="266" y="209">1 invoke</text>
-  <path class="edge" d="M540 220H645" stroke="#C74634" marker-end="url(#arrowRed)"/>
-  <text class="edge-label" x="550" y="207">2 signed request</text>
-  <path class="edge" d="M865 228H955" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
-  <text class="edge-label" x="872" y="215">3 READY regions</text>
-  <path class="edge" d="M1065 280V330H860V395" stroke="#41729F" marker-end="url(#arrowBlue)"/>
-  <text class="edge-label" x="880" y="317">4 one Search per region</text>
-  <path class="edge" d="M985 458H1045" stroke="#41729F" marker-end="url(#arrowBlue)"/>
-  <text class="edge-label" x="990" y="445">5 OCIDs</text>
-  <path class="edge" d="M1285 458H1340" stroke="#C74634" marker-end="url(#arrowRed)"/>
-  <text class="edge-label" x="1287" y="445">6 read</text>
-  <path class="edge" d="M1045 530V580H610V485H590" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
-  <text class="edge-label" x="705" y="568">7 full SDK details</text>
-  <path class="edge" d="M455 555V620" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
-  <text class="edge-label" x="468" y="593">8 inventory</text>
-  <path class="edge" d="M320 682H275" stroke="#3F7D5A" marker-end="url(#arrowGreen)"/>
-  <text class="edge-label" x="278" y="669">9 write</text>
-
-  <rect x="650" y="770" width="880" height="68" rx="9" fill="#FFF8DF" stroke="#D6B656"/>
-  <text x="670" y="797" font-size="13" font-weight="700">Scope</text>
-  <text x="718" y="797" font-size="13">Read-only OCI API calls; no database or tenancy resources are changed.</text>
-  <text x="670" y="820" font-size="13">Search results reflect the principal's permissions and the regional Search index.</text>
-  <text x="50" y="884" font-size="11" fill="#77716C">Editable source: diagrams.net (.drawio) • OCI service icon in the editable source derives from Oracle's OCI Architecture Diagram Toolkit</text>
+  <rect x="235" y="828" width="1130" height="74" rx="9" fill="#fff8df" stroke="#d6b656"/>
+  <text x="260" y="858" class="h">Scope and accuracy contract</text>
+  <text x="260" y="883" class="t">Read-only calls. Search is regional and permission-filtered. Missing volume details retain the attachment, leave size unknown, and mark totals incomplete.</text>
+  <text x="48" y="958" class="small">Editable source: diagrams.net (.drawio) | OCI service topology | Report schema v2.0</text>
 </svg>

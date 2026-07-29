@@ -1,37 +1,59 @@
-# OCI IAM policy examples
+# IAM policy guidance
 
-The collector is read-only. OCI Search itself does not require a separate
-Search permission; Search only returns resource metadata the caller is already
-allowed to inspect. The Database API lookup and the region-subscription lookup
-do require permissions.
+The collector is read-only, but `GetInstance` requires a read-level instance
+permission. Volume size lookups and attachment listings use inspect-level
+Block Volume permissions.
 
-For an identity-domain group, adapt the placeholders:
+## Identity-domain group
 
 ```text
 Allow group <identity-domain>/<group-name> to inspect tenancies in tenancy
 Allow group <identity-domain>/<group-name> to inspect autonomous-databases in tenancy
+Allow group <identity-domain>/<group-name> to read instance-family in tenancy
+Allow group <identity-domain>/<group-name> to inspect volume-family in tenancy
 ```
 
-For an instance principal in a dynamic group:
+## Instance principal
+
+Put the reporting Compute instance in a dynamic group, then grant:
 
 ```text
 Allow dynamic-group <dynamic-group-name> to inspect tenancies in tenancy
 Allow dynamic-group <dynamic-group-name> to inspect autonomous-databases in tenancy
+Allow dynamic-group <dynamic-group-name> to read instance-family in tenancy
+Allow dynamic-group <dynamic-group-name> to inspect volume-family in tenancy
 ```
 
-For a resource principal, use the principal form appropriate to the OCI
-service hosting the executable and grant the same two resource permissions.
-There is deliberately no generic `any-user` statement here because the safe
-condition differs for Functions, Container Instances, Data Flow, OKE, and
-other runtimes.
+## Why these verbs
 
-These are starting points, not a substitute for your tenancy's IAM review.
-Compartment-level Autonomous Database access can be used if the report should
-cover only selected compartments, but the region-subscription permission is a
-tenancy-level IAM permission.
+- `inspect tenancies` permits `ListRegionSubscriptions`.
+- `inspect autonomous-databases` permits Autonomous Database detail reads.
+- `read instance-family` includes the `INSTANCE_READ` permission required by
+  `GetInstance` and attachment read permissions.
+- `inspect volume-family` covers volume inspection and volume-attachment
+  inspection used by `GetBootVolume`, `GetVolume`, and attachment listing.
+- OCI Search has no separate resource permission; results reflect the
+  principal's permissions for each indexed resource.
 
-References:
+If your security standard avoids aggregate resource families, replace the
+family statements with individual resource-type policies after validating all
+required permissions in Oracle's Core Services IAM reference.
 
-- [Details for IAM: `ListRegionSubscriptions` requires `TENANCY_INSPECT`](https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/iampolicyreference.htm)
-- [Details for Search](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/searchpolicyreference.htm)
-- [Autonomous Database IAM policy details](https://docs.oracle.com/en/cloud/paas/autonomous-database/adbsa/autonomous-database-iam-policies.html)
+## Resource principals
+
+Resource-principal policy syntax depends on the hosting OCI service. Scope an
+`any-user` statement with `request.principal.type` and any available
+service-specific conditions. Do not use an unconditioned `any-user` grant.
+
+## Compartment scope
+
+The examples use `in tenancy` because the requested inventory spans every
+compartment. A compartment-scoped policy intentionally produces a partial
+inventory and Search will omit resources outside that scope.
+
+## References
+
+- [Core Services IAM reference](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/corepolicyreference.htm)
+- [Database Service IAM reference](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/databasepolicyreference.htm)
+- [Search permissions](https://docs.oracle.com/en-us/iaas/Content/Search/Concepts/querypermissions.htm)
+- [Automatic Oracle-Tags defaults](https://docs.oracle.com/en-us/iaas/Content/Tagging/Concepts/understandingautomaticdefaulttags.htm)

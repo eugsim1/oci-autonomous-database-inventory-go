@@ -1,9 +1,10 @@
-# OCI Autonomous Database Inventory for Go
+# OCI Autonomous Database and Compute Inventory for Go
 
-`oci-adb-inventory` is a read-only Go utility that discovers every Autonomous
-Database visible to the caller in every `READY` OCI region subscription,
-retrieves the complete configuration from the Database Service API, and
-creates timestamped JSON, CSV, and Markdown reports.
+`oci-adb-inventory` is a read-only Go utility that inventories Autonomous
+Databases, Compute instances, and their currently attached boot and block
+volumes in every `READY` OCI region subscribed by a tenancy. It uses OCI
+Search for discovery, then authoritative service APIs for complete
+configuration and exact storage sizes.
 
 > [!IMPORTANT]
 > **Disclaimer:** This is an independent personal project. It is not an Oracle
@@ -14,34 +15,54 @@ creates timestamped JSON, CSV, and Markdown reports.
 
 ## What it collects
 
-- all `READY` regions returned by Identity `ListRegionSubscriptions`;
-- Autonomous Database OCIDs discovered with the exact structured query
-  `query autonomousdatabase resources` in each region;
-- the full `GetAutonomousDatabase` SDK object for every discovered OCID;
-- ECPU/OCPU model and compute count without making a conversion;
-- legacy CPU-core and OCPU fields when OCI returns them;
-- exact configured storage in GB and/or TB, used and allocated storage fields;
-- workload, lifecycle, database version, infrastructure, license, edition,
-  scaling, Data Guard, endpoint, access-control, mTLS, and tag configuration;
-- partial collection errors, including their region, stage, and resource OCID.
+### Autonomous Databases
 
-The JSON file is canonical and preserves all fields exposed by the pinned OCI
-Go SDK. CSV and Markdown provide normalized, practical views.
+- all OCIDs found by `query autonomousdatabase resources`;
+- the complete `GetAutonomousDatabase` SDK object;
+- ECPU/OCPU model, configured compute, auto-scaling, and legacy CPU fields;
+- configured, used, and allocated storage fields;
+- workload, version, lifecycle, licensing, endpoints, networking, Data Guard,
+  access-control, mTLS, tags, and all other fields returned by the pinned SDK.
+- normalized `Oracle-Tags.CreatedOn`, elapsed age in days, and
+  `Oracle-Tags.CreatedBy`, using the same audit rules as Compute.
+
+### Compute and Block Volume
+
+- all Compute OCIDs found by `query instance resources`;
+- the complete `GetInstance` SDK object, including shape configuration;
+- shape, OCPUs, VCPUs, memory, availability/fault domain, local disks, and state;
+- every boot-volume attachment currently in `ATTACHED` state;
+- every data-volume attachment currently in `ATTACHED` state;
+- the complete `GetBootVolume` or `GetVolume` object for each attachment;
+- exact API `sizeInGBs` and deprecated `sizeInMBs` values without rounding;
+- per-instance boot, block, and combined attached-storage totals;
+- attachment type, lifecycle, device, read-only/shareable flags, and encryption;
+- `Oracle-Tags.CreatedOn`, `Oracle-Tags.CreatedBy`, normalized UTC creation time,
+  and whole elapsed age in days as of the report timestamp for instances and
+  volumes.
+
+If attachment listing fails, or an attachment is found but its detail lookup
+fails, the known attachment is retained where possible, its size is left
+unknown, an error is recorded, and the instance's storage total is marked
+incomplete. The tool never reports a partial total as complete.
+
+The canonical JSON preserves complete SDK objects. The two CSV files and the
+Markdown report provide stable normalized views.
 
 ## Architecture
 
-The editable diagram uses an Autonomous Database service icon from Oracle's
-OCI Architecture Diagram Toolkit.
+The editable diagram uses an OCI-styled service topology and covers Database,
+Compute, and Block Volume enrichment.
 
-![OCI Autonomous Database inventory architecture](docs/diagrams/oci-adb-inventory-architecture.svg)
+![OCI tenancy inventory architecture](docs/diagrams/oci-adb-inventory-architecture.svg)
 
 ### SDD sequence
 
-The Software Design Description sequence shows authentication, all-region
-fan-out, Search pagination, Database API enrichment, normalization, and atomic
-report writing.
+The sequence diagram shows authentication, all-region Search fan-out, database
+and compute enrichment, attachment pagination, volume lookups, Oracle tag age
+calculation, and atomic report writing.
 
-![OCI Autonomous Database inventory SDD sequence](docs/diagrams/oci-adb-inventory-sdd-sequence.svg)
+![OCI tenancy inventory SDD sequence](docs/diagrams/oci-adb-inventory-sdd-sequence.svg)
 
 - [Editable architecture diagram](docs/diagrams/oci-adb-inventory-architecture.drawio)
 - [Architecture PNG](docs/diagrams/oci-adb-inventory-architecture.png)
@@ -49,42 +70,47 @@ report writing.
 - [SDD sequence PNG](docs/diagrams/oci-adb-inventory-sdd-sequence.png)
 - [Software design description](docs/SDD.md)
 
-## How discovery works
+## Discovery and enrichment flow
 
 ```text
 Identity.ListRegionSubscriptions
   -> every READY region
-     -> ResourceSearch.SearchResources
-        query autonomousdatabase resources
-        (full pagination)
-        -> Autonomous Database OCIDs
-           -> Database.GetAutonomousDatabase
-              -> complete SDK configuration + normalized summary
-                 -> timestamped JSON + CSV + Markdown
+     -> SearchResources("query autonomousdatabase resources")
+        -> Database.GetAutonomousDatabase
+     -> SearchResources("query instance resources")
+        -> Compute.GetInstance
+        -> Compute.ListBootVolumeAttachments(instance, AD)
+           -> Blockstorage.GetBootVolume
+        -> Compute.ListVolumeAttachments(instance)
+           -> Blockstorage.GetVolume
+     -> normalize sizes + Oracle-Tags audit fields
+        -> timestamped JSON + 2 CSV files + Markdown
 ```
 
-OCI Search scopes results to the selected region, which is why the program
-executes the query once per `READY` subscription. Results only contain
-resources the principal is authorized to inspect.
+OCI Search is region-scoped, so both paginated queries run in every selected
+region. Results are de-duplicated by `(region, OCID)`. The service-specific
+`Get` and attachment APIs are the source of truth for the report.
 
 ## Prerequisites
 
 - Go 1.24 or newer;
-- an OCI API signing-key configuration, an OCI Compute instance principal, or
-  an OCI resource-principal runtime;
-- IAM permission to inspect the tenancy and Autonomous Databases;
-- network access to the Identity, Resource Search, and Database Service
-  endpoints in the subscribed regions.
+- OCI API signing-key configuration, an OCI Compute instance principal, or an
+  OCI resource-principal runtime;
+- the IAM permissions below;
+- network access to Identity, Resource Search, Database, Compute, and Block
+  Volume endpoints in all selected regions.
 
 The project pins `github.com/oracle/oci-go-sdk/v65` at `v65.117.1`.
 
 ## IAM policy examples
 
-For an identity-domain group, adapt the placeholders:
+For an identity-domain group:
 
 ```text
 Allow group <identity-domain>/<group-name> to inspect tenancies in tenancy
 Allow group <identity-domain>/<group-name> to inspect autonomous-databases in tenancy
+Allow group <identity-domain>/<group-name> to read instance-family in tenancy
+Allow group <identity-domain>/<group-name> to inspect volume-family in tenancy
 ```
 
 For an instance principal:
@@ -92,11 +118,15 @@ For an instance principal:
 ```text
 Allow dynamic-group <dynamic-group-name> to inspect tenancies in tenancy
 Allow dynamic-group <dynamic-group-name> to inspect autonomous-databases in tenancy
+Allow dynamic-group <dynamic-group-name> to read instance-family in tenancy
+Allow dynamic-group <dynamic-group-name> to inspect volume-family in tenancy
 ```
 
-Search does not require a separate permission. It returns only the metadata
-covered by the caller's existing inspect/read permissions. See
-[the IAM notes and resource-principal guidance](policies/README.md).
+`read instance-family` is required because `GetInstance` needs
+`INSTANCE_READ`. `inspect volume-family` provides the inspect permissions used
+by the volume and attachment read operations. OCI Search uses the caller's
+existing permissions and needs no separate Search policy. See
+[policies/README.md](policies/README.md) for least-privilege notes.
 
 ## Build and test
 
@@ -125,7 +155,7 @@ named by `OCI_CONFIG_FILE`:
   --output-dir reports
 ```
 
-Use another config and profile:
+Use a different configuration and profile:
 
 ```bash
 ./bin/oci-adb-inventory \
@@ -135,12 +165,10 @@ Use another config and profile:
   --output-dir reports
 ```
 
-The OCI config contains references to the private key; the private key is
-never copied into a report.
+The private key is only used by the SDK signer and is never copied into a
+report.
 
 ## Run with an instance principal
-
-From an OCI Compute instance included in an authorized dynamic group:
 
 ```bash
 ./bin/oci-adb-inventory \
@@ -150,20 +178,18 @@ From an OCI Compute instance included in an authorized dynamic group:
 
 ## Run with a resource principal
 
-From a supported OCI runtime with resource-principal environment variables:
-
 ```bash
 ./bin/oci-adb-inventory \
   --auth resource_principal \
   --output-dir reports
 ```
 
-The hosting service's resource-principal policy condition must be scoped for
+The hosting service's resource-principal policy condition must be scoped to
 that service. Do not use an unconditioned `any-user` policy.
 
 ## Region selection
 
-By default, every `READY` subscribed region is scanned. To request a subset:
+All `READY` subscribed regions are scanned by default. To scan a subset:
 
 ```bash
 ./bin/oci-adb-inventory \
@@ -171,9 +197,8 @@ By default, every `READY` subscribed region is scanned. To request a subset:
   --output-dir reports
 ```
 
-The program rejects a requested region that is not subscribed or not `READY`.
-`--bootstrap-region` can override the region used for the initial Identity
-call when the authentication provider does not supply the desired one.
+The tool rejects regions that are not subscribed or not `READY`.
+`--bootstrap-region` controls the initial Identity endpoint when needed.
 
 ## Reports
 
@@ -181,85 +206,117 @@ A run at `2026-07-29T10:11:12Z` writes:
 
 ```text
 reports/
-  oci-autonomous-database-inventory-20260729T101112Z.json
-  oci-autonomous-database-inventory-20260729T101112Z.csv
-  oci-autonomous-database-inventory-20260729T101112Z.md
+  oci-tenancy-inventory-20260729T101112Z.json
+  oci-tenancy-inventory-20260729T101112Z-autonomous-databases.csv
+  oci-tenancy-inventory-20260729T101112Z-compute-instances.csv
+  oci-tenancy-inventory-20260729T101112Z.md
 ```
 
 ### JSON
 
-The canonical report contains run metadata, region subscriptions, errors, and
-one record per Autonomous Database:
+The JSON report has schema version `2.0`. Each Compute record contains the
+complete instance object and nested boot/data volume objects:
 
 ```json
 {
   "summary": {
-    "region": "eu-paris-1",
-    "compute_model": "ECPU",
-    "compute_count": 4,
-    "ecpus": 4,
-    "data_storage_size_in_gbs": 1024
+    "display_name": "app-01",
+    "shape": "VM.Standard.E5.Flex",
+    "oracle_tags": {
+      "created_on_raw": "2026-07-01T08:30:00Z",
+      "created_on_utc": "2026-07-01T08:30:00Z",
+      "created_by": "alice@example.com",
+      "age_days_as_of_report": 28,
+      "created_on_tag_status": "parsed"
+    },
+    "boot_volume_total_size_in_gbs": 100,
+    "attached_block_volume_total_size_in_gbs": 500,
+    "attached_storage_total_size_in_gbs": 600,
+    "attached_storage_size_complete": true
   },
   "configuration": {
-    "id": "ocid1.autonomousdatabase.oc1.eu-paris-1...",
-    "computeModel": "ECPU",
-    "computeCount": 4,
-    "dataStorageSizeInGBs": 1024
-  }
+    "id": "ocid1.instance.oc1...",
+    "shape": "VM.Standard.E5.Flex"
+  },
+  "boot_volumes": [],
+  "attached_block_volumes": []
 }
 ```
 
-`configuration` is the complete SDK object, not the abbreviated example above.
+`configuration` and the nested volume records contain complete SDK objects,
+not the abbreviated example above.
 
-### CPU semantics
+### Oracle-Tags creation semantics
 
-The program follows the API fields:
+Creation attribution for Autonomous Databases, Compute instances, boot
+volumes, and block volumes is taken only from the defined-tag namespace
+`Oracle-Tags`:
 
-| OCI fields | Summary behavior |
-|---|---|
-| `computeModel = ECPU`, `computeCount = N` | `ecpus = N` |
-| `computeModel = OCPU`, `computeCount = N` | `ocpus = N` |
-| legacy `ocpuCount` | retained as OCPUs when the preferred OCPU compute count is absent |
-| legacy `cpuCoreCount` | retained separately as `legacy_cpu_core_count` |
+- `CreatedOn` is retained verbatim in `created_on_raw`;
+- valid RFC3339 values are normalized to UTC in `created_on_utc`;
+- `age_days_as_of_report` is the number of complete elapsed 24-hour periods
+  between the tag timestamp and the report's `generated_at`;
+- `CreatedBy` is retained verbatim;
+- `created_on_tag_status` is `parsed`, `missing`, `invalid`, or `unavailable`
+  when a volume detail lookup failed.
 
-No ECPU-to-OCPU conversion is attempted. Regional totals are base configured
-compute values; they are not multiplied by an auto-scaling factor.
+OCI's separate API `timeCreated` field is retained as `oci_time_created` but is
+not substituted for a missing `Oracle-Tags.CreatedOn`. This makes the requested
+tag provenance auditable. Tenancies without the automatic tag defaults, older
+resources, or resources whose tags were removed can legitimately report
+`missing`.
 
 ### Storage semantics
 
-`dataStorageSizeInGBs` and `dataStorageSizeInTBs` are both retained exactly as
-returned. For a common aggregation column, the program uses the exact GB value
-when present; otherwise it computes `TB × 1024`.
+Compute storage values use the exact integer `sizeInGBs` returned by
+`GetBootVolume` and `GetVolume`. The tool does not estimate guest filesystem
+usage or partition sizes. Only attachments whose lifecycle state is
+`ATTACHED` are counted.
 
-The report also retains `usedDataStorageSizeInGBs`,
-`usedDataStorageSizeInTBs`, `allocatedStorageSizeInTBs`, and
-`actualUsedDataStorageSizeInTBs` when the API supplies them.
+Instance totals include:
 
-### CSV
+| Field | Meaning |
+|---|---|
+| `boot_volume_total_size_in_gbs` | Sum of attached boot-volume API sizes |
+| `attached_block_volume_total_size_in_gbs` | Sum of attached data-volume API sizes |
+| `attached_storage_total_size_in_gbs` | Boot plus attached data volumes |
+| `boot_volume_inventory_complete` | Boot-attachment listing completed |
+| `block_volume_inventory_complete` | Block-attachment listing completed |
+| `attached_storage_size_complete` | `true` only when both attachment listings complete and every discovered attachment has a known API size |
 
-The CSV contains one row per database and stable summary columns suitable for
-Excel, databases, or FinOps processing. Nested SDK configuration stays in
-JSON, where its structure and types can be preserved.
+Local NVMe/storage supplied by a Compute shape is retained separately in shape
+configuration and is not added to Block Volume totals.
+
+Autonomous Database storage retains OCI's GB and TB fields exactly. Its
+normalized aggregation uses the GB value when present, otherwise `TB * 1024`.
+
+### CSV files
+
+The Autonomous Database CSV contains one row per database. The Compute CSV
+contains one row per attached boot or data volume, repeating the parent
+instance fields so it can be filtered or pivoted directly. An instance with no
+retrievable attachments still receives an instance-only row.
 
 ### Markdown
 
-The Markdown report gives per-region totals, a compact database table, links
-to the sibling JSON/CSV files, and a collection-error table.
+The Markdown report provides regional totals, Autonomous Database details,
+Compute instance/tag-age/storage totals, individual attached-volume sizes, and
+collection errors.
 
 ## Failure behavior
 
-Authentication and region-subscription failures stop the run. Regional Search
-and individual database-detail failures are recorded while other regions and
-resources continue.
+Authentication and region-subscription failures stop the run. Regional Search,
+individual resource, attachment-list, and volume-detail errors are recorded
+while independent regions and resources continue.
 
-Use strict mode for scheduling or CI:
+Strict mode writes the partial report and then returns non-zero if any
+collection error occurred:
 
 ```bash
 ./bin/oci-adb-inventory --strict --output-dir reports
 ```
 
-Strict mode still writes the partial report, then returns a non-zero status if
-any collection error was recorded. `--timeout` bounds the complete run:
+The timeout and bounded worker pool apply to the entire collection:
 
 ```bash
 ./bin/oci-adb-inventory --timeout 45m --workers 12
@@ -283,8 +340,6 @@ any collection error was recorded. `--timeout` bounds the complete run:
 
 ## Container
 
-API keys require the config and private key to be mounted read-only:
-
 ```bash
 docker build -t oci-adb-inventory .
 docker run --rm \
@@ -295,17 +350,17 @@ docker run --rm \
   --output-dir /reports
 ```
 
-For OCI principal authentication, use the runtime integration provided by the
-hosting service instead of placing credentials in the image.
+For principal authentication, use the supported identity integration of the
+OCI runtime rather than placing credentials in the image.
 
 ## Security notes
 
-- The collector performs only Identity list, Resource Search, and Database get
-  operations.
-- Reports are created with restricted file permissions where supported.
+- All OCI operations are reads.
+- Reports use restricted file permissions where supported and are written
+  through a temporary file followed by an atomic rename.
 - `reports/` is excluded from Git.
-- Full JSON can contain OCIDs, endpoint names, ACLs, network metadata, tags,
-  and customer-contact metadata. Store and share it accordingly.
+- Full JSON can contain instance metadata, OCIDs, IP/network data, tags,
+  endpoints, ACLs, and customer-contact metadata. Store it as sensitive data.
 - OCI Search is index-backed and can be eventually consistent immediately
   after a resource change.
 
@@ -313,26 +368,24 @@ hosting service instead of placing credentials in the image.
 
 ```text
 cmd/oci-adb-inventory/   CLI entry point
-internal/config/         flag parsing and validation
-internal/oci/            authentication, regions, Search, Database API
-internal/model/          report and normalization model
-internal/report/         atomic JSON, CSV, Markdown writers
-docs/                    SDD and editable/rendered diagrams
-policies/                IAM guidance
+internal/config/         flags and validation
+internal/model/          canonical report model, tag audit, normalization
+internal/oci/            auth, Search, Database, Compute, Block Volume clients
+internal/report/         JSON, two CSV files, Markdown, atomic writes
+docs/                    SDD and editable diagrams
+policies/                IAM and resource-principal guidance
 ```
 
-## Official references
+## Oracle documentation
 
-- [OCI Search language syntax](https://docs.oracle.com/en-us/iaas/Content/Search/Concepts/querysyntax.htm)
-- [Querying resources and regional scope](https://docs.oracle.com/en-us/iaas/Content/Search/Tasks/queryingresources.htm)
-- [OCI Go SDK Resource Search package](https://docs.oracle.com/en-us/iaas/tools/go/latest/resourcesearch/index.html)
-- [OCI Go SDK Database package](https://docs.oracle.com/en-us/iaas/tools/go/latest/database/index.html)
-- [OCI Go SDK Identity package](https://docs.oracle.com/en-us/iaas/tools/go/latest/identity/index.html)
-- [OCI SDK authentication methods](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdk_authentication_methods.htm)
-- [IAM details for Search](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/searchpolicyreference.htm)
+- [Search query language](https://docs.oracle.com/en-us/iaas/Content/Search/Concepts/querysyntax.htm)
+- [Querying resources](https://docs.oracle.com/en-us/iaas/Content/Search/Tasks/queryingresources.htm)
+- [Automatic Oracle-Tags defaults](https://docs.oracle.com/en-us/iaas/Content/Tagging/Concepts/understandingautomaticdefaulttags.htm)
+- [Core Services IAM policy reference](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/corepolicyreference.htm)
+- [Getting boot-volume details](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/get-bv-boot-volume.htm)
+- [Getting block-volume details](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/get-bv-volume.htm)
+- [OCI Go SDK authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/gosdkgettingstarted.htm)
 
 ## License
 
-Source code is available under the [MIT License](LICENSE). Oracle trademarks,
-documentation, APIs, and OCI Architecture Diagram Toolkit assets remain
-subject to their respective owners' terms.
+MIT. See [LICENSE](LICENSE).
