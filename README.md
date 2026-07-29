@@ -93,7 +93,7 @@ region. Results are de-duplicated by `(region, OCID)`. The service-specific
 
 ## Prerequisites
 
-- Go 1.24 or newer;
+- Go 1.25 or newer;
 - OCI API signing-key configuration, an OCI Compute instance principal, or an
   OCI resource-principal runtime;
 - the IAM permissions below;
