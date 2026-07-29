@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1654" height="930" viewBox="0 0 1654 930" role="img" aria-labelledby="title desc">
+  <title id="title">OCI Autonomous Database Configuration Inventory architecture</title>
+  <desc id="desc">Read-only multi-region discovery using Identity region subscriptions, OCI Resource Search, Database GetAutonomousDatabase, normalization, and timestamped reports.</desc>
+  <defs>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#41729F"/></marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#C74634"/></marker>
+    <marker id="arrowGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#8B7E74"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#3F7D5A"/></marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #161513; }
+      .h1 { font-size: 28px; font-weight: 700; }
+      .sub { font-size: 15px; fill: #5b5652; }
+      .box-title { font-size: 15px; font-weight: 700; text-anchor: middle; }
+      .body { font-size: 13px; text-anchor: middle; }
+      .edge { fill: none; stroke-width: 2.5; }
+      .edge-label { font-size: 12px; font-weight: 600; paint-order: stroke; stroke: white; stroke-width: 5; stroke-linejoin: round; }
+      .section { font-size: 16px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="1654" height="930" fill="#fff"/>
+  <text class="h1" x="50" y="58">OCI Autonomous Database Configuration Inventory</text>
+  <text class="sub" x="50" y="88">Read-only, tenancy-wide, multi-region discovery with complete Database API enrichment</text>
+
+  <rect x="590" y="110" width="990" height="610" rx="16" fill="#FFF7F2" stroke="#C74634" stroke-width="3"/>
+  <rect x="590" y="110" width="990" height="45" rx="16" fill="#F9E5DE"/>
+  <path d="M590 155 H1580" stroke="#C74634" stroke-width="2"/>
+  <text class="section" x="615" y="140" fill="#C74634">OCI TENANCY</text>
+
+  <rect x="50" y="170" width="210" height="105" rx="12" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/>
+  <text class="box-title" x="155" y="198">Operator / Scheduler</text>
+  <text class="body" x="155" y="229"><tspan x="155">CLI, cron, CI,</tspan><tspan x="155" dy="20">or OCI runtime</tspan></text>
+
+  <rect x="320" y="145" width="220" height="150" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
+  <text class="box-title" x="430" y="176">OCI SDK auth provider</text>
+  <text class="body" x="430" y="208"><tspan x="430">API signing key</tspan><tspan x="430" dy="20">Instance principal</tspan><tspan x="430" dy="20">Resource principal</tspan></text>
+
+  <rect x="645" y="175" width="220" height="105" rx="12" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/>
+  <text class="box-title" x="755" y="203">Identity Service</text>
+  <text class="body" x="755" y="233"><tspan x="755">ListRegionSubscriptions</tspan><tspan x="755" dy="20">TENANCY_INSPECT</tspan></text>
+
+  <rect x="955" y="175" width="220" height="105" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
+  <text class="box-title" x="1065" y="203">READY-region fan-out</text>
+  <text class="body" x="1065" y="233"><tspan x="1065">Bounded worker pool</tspan><tspan x="1065" dy="20">SDK retry policy</tspan></text>
+
+  <rect x="680" y="325" width="850" height="325" rx="12" fill="#fff" stroke="#B7AEA7" stroke-width="2" stroke-dasharray="9 7"/>
+  <text x="705" y="355" font-size="14" font-weight="700" fill="#5b5652">FOR EACH READY SUBSCRIBED REGION</text>
+
+  <rect x="735" y="395" width="250" height="125" rx="12" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/>
+  <text class="box-title" x="860" y="424">OCI Resource Search</text>
+  <text class="body" x="860" y="453"><tspan x="860">query autonomousdatabase resources</tspan><tspan x="860" dy="23">Full pagination</tspan><tspan x="860" dy="19">(1,000 results per page)</tspan></text>
+
+  <rect x="1045" y="395" width="240" height="125" rx="12" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/>
+  <text class="box-title" x="1165" y="424">Database Service API</text>
+  <text class="body" x="1165" y="453"><tspan x="1165">GetAutonomousDatabase</tspan><tspan x="1165" dy="23">Authoritative full</tspan><tspan x="1165" dy="19">configuration</tspan></text>
+
+  <rect x="1340" y="375" width="145" height="165" rx="12" fill="#fff" stroke="#C74634" stroke-width="2"/>
+  <g transform="translate(1382 392)" stroke="#2D5967" stroke-width="3" fill="none">
+    <ellipse cx="31" cy="10" rx="28" ry="9" fill="#E7F0F7"/>
+    <path d="M3 10v40c0 6 13 10 28 10s28-4 28-10V10"/>
+    <path d="M3 30c0 6 13 10 28 10s28-4 28-10"/>
+    <circle cx="49" cy="51" r="13" fill="#fff"/>
+    <path d="M43 51l4 4 8-10" stroke="#C74634"/>
+  </g>
+  <text class="box-title" x="1412" y="475"><tspan x="1412">Autonomous</tspan><tspan x="1412" dy="18">Database</tspan></text>
+  <text class="body" x="1412" y="518">ECPU / OCPU • GB / TB</text>
+
+  <rect x="320" y="415" width="270" height="140" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
+  <text class="box-title" x="455" y="444">Collector + normalizer</text>
+  <text class="body" x="455" y="474"><tspan x="455">Preserve complete SDK object</tspan><tspan x="455" dy="21">Derive ECPU/OCPU/storage summary</tspan><tspan x="455" dy="21">Sort and record partial errors</tspan></text>
+
+  <rect x="320" y="620" width="270" height="125" rx="12" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/>
+  <text class="box-title" x="455" y="649">Atomic report writer</text>
+  <text class="body" x="455" y="679"><tspan x="455">UTC timestamp • restricted permissions</tspan><tspan x="455" dy="22">Temporary file + rename</tspan></text>
+
+  <rect x="50" y="615" width="225" height="135" rx="12" fill="#E5F2EA" stroke="#3F7D5A" stroke-width="2"/>
+  <text class="box-title" x="162" y="644">Timestamped reports</text>
+  <text class="body" x="162" y="674"><tspan x="162">JSON — complete configuration</tspan><tspan x="162" dy="21">CSV — flat inventory</tspan><tspan x="162" dy="21">Markdown — regional summary</tspan></text>
+
+  <path class="edge" d="M260 222H320" stroke="#41729F" marker-end="url(#arrowBlue)"/>
+  <text class="edge-label" x="266" y="209">1 invoke</text>
+  <path class="edge" d="M540 220H645" stroke="#C74634" marker-end="url(#arrowRed)"/>
+  <text class="edge-label" x="550" y="207">2 signed request</text>
+  <path class="edge" d="M865 228H955" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
+  <text class="edge-label" x="872" y="215">3 READY regions</text>
+  <path class="edge" d="M1065 280V330H860V395" stroke="#41729F" marker-end="url(#arrowBlue)"/>
+  <text class="edge-label" x="880" y="317">4 one Search per region</text>
+  <path class="edge" d="M985 458H1045" stroke="#41729F" marker-end="url(#arrowBlue)"/>
+  <text class="edge-label" x="990" y="445">5 OCIDs</text>
+  <path class="edge" d="M1285 458H1340" stroke="#C74634" marker-end="url(#arrowRed)"/>
+  <text class="edge-label" x="1287" y="445">6 read</text>
+  <path class="edge" d="M1045 530V580H610V485H590" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
+  <text class="edge-label" x="705" y="568">7 full SDK details</text>
+  <path class="edge" d="M455 555V620" stroke="#8B7E74" marker-end="url(#arrowGray)"/>
+  <text class="edge-label" x="468" y="593">8 inventory</text>
+  <path class="edge" d="M320 682H275" stroke="#3F7D5A" marker-end="url(#arrowGreen)"/>
+  <text class="edge-label" x="278" y="669">9 write</text>
+
+  <rect x="650" y="770" width="880" height="68" rx="9" fill="#FFF8DF" stroke="#D6B656"/>
+  <text x="670" y="797" font-size="13" font-weight="700">Scope</text>
+  <text x="718" y="797" font-size="13">Read-only OCI API calls; no database or tenancy resources are changed.</text>
+  <text x="670" y="820" font-size="13">Search results reflect the principal's permissions and the regional Search index.</text>
+  <text x="50" y="884" font-size="11" fill="#77716C">Editable source: diagrams.net (.drawio) • OCI service icon in the editable source derives from Oracle's OCI Architecture Diagram Toolkit</text>
+</svg>

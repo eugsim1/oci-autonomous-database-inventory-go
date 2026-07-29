@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1654" height="1050" viewBox="0 0 1654 1050" role="img" aria-labelledby="title desc">
+  <title id="title">Software design sequence for OCI Autonomous Database Inventory</title>
+  <desc id="desc">Sequence from operator invocation through provider selection, region discovery, Search pagination, Database API lookups, normalization, and atomic report writing.</desc>
+  <defs>
+    <marker id="arrBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#41729F"/></marker>
+    <marker id="arrRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#C74634"/></marker>
+    <marker id="arrGray" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#8B7E74"/></marker>
+    <marker id="arrGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#3F7D5A"/></marker>
+    <style>
+      text { font-family: Arial, sans-serif; fill: #161513; }
+      .h1 { font-size: 27px; font-weight: 700; }
+      .sub { font-size: 15px; fill: #5b5652; }
+      .participant { font-size: 13px; font-weight: 700; text-anchor: middle; }
+      .life { stroke-width: 1.4; stroke-dasharray: 7 7; }
+      .msg { stroke-width: 2.2; fill: none; }
+      .ret { stroke-width: 1.6; stroke-dasharray: 7 5; fill: none; }
+      .label { font-size: 12px; font-weight: 600; paint-order: stroke; stroke: white; stroke-width: 5; stroke-linejoin: round; }
+      .loop-label { font-size: 12px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="1654" height="1050" fill="#fff"/>
+  <text class="h1" x="45" y="58">Software Design Sequence — OCI Autonomous Database Inventory</text>
+  <text class="sub" x="45" y="87">Bounded, read-only collection with partial-error reporting and deterministic output</text>
+
+  <g>
+    <rect x="35" y="115" width="155" height="55" rx="9" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/><text class="participant" x="112" y="148">Operator / Scheduler</text>
+    <rect x="225" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="302" y="148">Go CLI</text>
+    <rect x="415" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="492" y="148">Auth provider</text>
+    <rect x="605" y="115" width="155" height="55" rx="9" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/><text class="participant" x="682" y="148">OCI Identity</text>
+    <rect x="795" y="115" width="155" height="55" rx="9" fill="#E7F0F7" stroke="#41729F" stroke-width="2"/><text class="participant" x="872" y="148">OCI Search</text>
+    <rect x="985" y="115" width="155" height="55" rx="9" fill="#F9E5DE" stroke="#C74634" stroke-width="2"/><text class="participant" x="1062" y="148">Database API</text>
+    <rect x="1175" y="115" width="155" height="55" rx="9" fill="#F4F1ED" stroke="#8B7E74" stroke-width="2"/><text class="participant" x="1252" y="148">Normalizer</text>
+    <rect x="1365" y="115" width="155" height="55" rx="9" fill="#E5F2EA" stroke="#3F7D5A" stroke-width="2"/><text class="participant" x="1442" y="148">Report writer</text>
+  </g>
+
+  <line class="life" x1="112" y1="170" x2="112" y2="885" stroke="#41729F"/>
+  <line class="life" x1="302" y1="170" x2="302" y2="885" stroke="#8B7E74"/>
+  <line class="life" x1="492" y1="170" x2="492" y2="885" stroke="#8B7E74"/>
+  <line class="life" x1="682" y1="170" x2="682" y2="885" stroke="#C74634"/>
+  <line class="life" x1="872" y1="170" x2="872" y2="885" stroke="#41729F"/>
+  <line class="life" x1="1062" y1="170" x2="1062" y2="885" stroke="#C74634"/>
+  <line class="life" x1="1252" y1="170" x2="1252" y2="885" stroke="#8B7E74"/>
+  <line class="life" x1="1442" y1="170" x2="1442" y2="885" stroke="#3F7D5A"/>
+
+  <line class="msg" x1="112" y1="205" x2="302" y2="205" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="153" y="195">1 run(flags)</text>
+  <line class="msg" x1="302" y1="245" x2="492" y2="245" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="343" y="235">2 select provider</text>
+  <line class="ret" x1="492" y1="280" x2="302" y2="280" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="335" y="270">3 provider + tenancy OCID</text>
+  <line class="msg" x1="302" y1="320" x2="682" y2="320" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="380" y="310">4 ListRegionSubscriptions(tenancy)</text>
+  <line class="ret" x1="682" y1="355" x2="302" y2="355" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="421" y="345">5 READY subscriptions</text>
+
+  <rect x="260" y="385" width="855" height="260" fill="#fff" fill-opacity=".55" stroke="#C74634" stroke-dasharray="8 6"/>
+  <path d="M260 385h365v25H260z" fill="#F9E5DE" stroke="#C74634"/>
+  <text class="loop-label" x="272" y="402">loop — each READY subscribed region (bounded workers)</text>
+
+  <rect x="275" y="420" width="635" height="95" fill="#fff" fill-opacity=".55" stroke="#41729F" stroke-dasharray="7 5"/>
+  <path d="M275 420h155v23H275z" fill="#E7F0F7" stroke="#41729F"/><text class="loop-label" x="286" y="436">loop — Search pages</text>
+  <line class="msg" x1="302" y1="458" x2="872" y2="458" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="403" y="450">6 SearchResources(query autonomousdatabase resources, page)</text>
+  <line class="ret" x1="872" y1="493" x2="302" y2="493" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="487" y="485">7 ResourceSummary[] + next page</text>
+
+  <rect x="275" y="525" width="825" height="105" fill="#fff" fill-opacity=".55" stroke="#C74634" stroke-dasharray="7 5"/>
+  <path d="M275 525h290v23H275z" fill="#F9E5DE" stroke="#C74634"/><text class="loop-label" x="286" y="541">loop — discovered Autonomous Database OCIDs</text>
+  <line class="msg" x1="302" y1="560" x2="1062" y2="560" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="534" y="552">8 GetAutonomousDatabase(OCID)</text>
+  <line class="ret" x1="1062" y1="600" x2="302" y2="600" stroke="#C74634" marker-end="url(#arrRed)"/><text class="label" x="535" y="592">9 complete AutonomousDatabase SDK object</text>
+
+  <line class="msg" x1="302" y1="680" x2="1252" y2="680" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="655" y="671">10 derive ECPU/OCPU/storage summary</text>
+  <line class="ret" x1="1252" y1="720" x2="302" y2="720" stroke="#8B7E74" marker-end="url(#arrGray)"/><text class="label" x="666" y="711">11 sorted records + collection errors</text>
+  <line class="msg" x1="302" y1="760" x2="1442" y2="760" stroke="#3F7D5A" marker-end="url(#arrGreen)"/><text class="label" x="700" y="751">12 write JSON + CSV + Markdown</text>
+  <line class="ret" x1="1442" y1="800" x2="302" y2="800" stroke="#3F7D5A" marker-end="url(#arrGreen)"/><text class="label" x="714" y="791">13 atomic rename + report paths</text>
+  <line class="msg" x1="302" y1="845" x2="112" y2="845" stroke="#41729F" marker-end="url(#arrBlue)"/><text class="label" x="116" y="835">14 counts, paths, exit status</text>
+
+  <path d="M510 910h670v90H510z" fill="#FFF8DF" stroke="#D6B656"/>
+  <path d="M1150 910l30 30h-30z" fill="#F1D98A" stroke="#D6B656"/>
+  <text x="530" y="938" font-size="13" font-weight="700">Partial failure contract</text>
+  <text x="530" y="963" font-size="13">Regional Search and per-resource Database API errors are retained in the report.</text>
+  <text x="530" y="985" font-size="13">With --strict, the partial report is written before a non-zero exit.</text>
+</svg>

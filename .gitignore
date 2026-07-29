@@ -1,0 +1,13 @@
+# Build outputs
+/bin/
+*.exe
+*.test
+
+# Generated reports can contain tenancy metadata.
+/reports/
+
+# Local OCI and editor files
+.env
+.idea/
+.vscode/
+*.swp
