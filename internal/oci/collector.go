@@ -2,6 +2,7 @@ package oci
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -29,8 +30,12 @@ type Collector struct {
 }
 
 type resourceRef struct {
-	Region string
-	ID     string
+	Region         string
+	ID             string
+	CompartmentID  string
+	DisplayName    string
+	LifecycleState string
+	TimeCreated    string
 }
 
 func NewCollector(cfg config.Config, logOutput io.Writer) (*Collector, error) {
@@ -51,7 +56,7 @@ func NewCollector(cfg config.Config, logOutput io.Writer) (*Collector, error) {
 
 func (c *Collector) Collect(ctx context.Context) (model.Report, error) {
 	report := model.Report{
-		SchemaVersion:  "2.0",
+		SchemaVersion:  "2.1",
 		GeneratedAt:    time.Now().UTC(),
 		TenancyOCID:    c.tenancyID,
 		Authentication: c.cfg.AuthMode,
@@ -225,11 +230,7 @@ func (c *Collector) searchAllRegions(
 			deduplicated[ref.Region+"\x00"+ref.ID] = ref
 		}
 		if item.err != nil {
-			errors = append(errors, model.CollectionError{
-				Stage:   errorStage,
-				Region:  item.region,
-				Message: item.err.Error(),
-			})
+			errors = append(errors, collectionError(errorStage, item.region, "", item.err))
 			fmt.Fprintf(c.logOutput, "warning: %s failed in %s: %v\n", errorStage, item.region, item.err)
 		}
 	}
@@ -280,7 +281,17 @@ func (c *Collector) searchRegion(
 			}
 			id := value(item.Identifier)
 			if id != "" {
-				refs = append(refs, resourceRef{Region: region, ID: id})
+				ref := resourceRef{
+					Region:         region,
+					ID:             id,
+					CompartmentID:  value(item.CompartmentId),
+					DisplayName:    value(item.DisplayName),
+					LifecycleState: value(item.LifecycleState),
+				}
+				if item.TimeCreated != nil {
+					ref.TimeCreated = item.TimeCreated.UTC().Format(time.RFC3339)
+				}
+				refs = append(refs, ref)
 			}
 		}
 		if response.OpcNextPage == nil || value(response.OpcNextPage) == "" {
@@ -335,14 +346,9 @@ func (c *Collector) getAllDatabases(
 	var errors []model.CollectionError
 	for item := range results {
 		if item.err != nil {
-			errors = append(errors, model.CollectionError{
-				Stage:      "get_autonomous_database",
-				Region:     item.ref.Region,
-				ResourceID: item.ref.ID,
-				Message:    item.err.Error(),
-			})
-			fmt.Fprintf(c.logOutput, "warning: database lookup failed in %s for %s: %v\n",
-				item.ref.Region, item.ref.ID, item.err)
+			failure := collectionErrorForRef("get_autonomous_database", item.ref, item.err)
+			errors = append(errors, failure)
+			logCollectionWarning(c.logOutput, "database lookup", failure)
 			continue
 		}
 		records = append(records, item.record)
@@ -418,14 +424,9 @@ func (c *Collector) getAllComputeInstances(
 	var errors []model.CollectionError
 	for item := range results {
 		if item.fatal != nil {
-			errors = append(errors, model.CollectionError{
-				Stage:      "get_compute_instance",
-				Region:     item.ref.Region,
-				ResourceID: item.ref.ID,
-				Message:    item.fatal.Error(),
-			})
-			fmt.Fprintf(c.logOutput, "warning: instance lookup failed in %s for %s: %v\n",
-				item.ref.Region, item.ref.ID, item.fatal)
+			failure := collectionErrorForRef("get_compute_instance", item.ref, item.fatal)
+			errors = append(errors, failure)
+			logCollectionWarning(c.logOutput, "instance lookup", failure)
 			continue
 		}
 		records = append(records, item.record)
@@ -607,12 +608,84 @@ func (c *Collector) getBlockVolumes(
 }
 
 func collectionError(stage, region, resourceID string, err error) model.CollectionError {
-	return model.CollectionError{
+	item := model.CollectionError{
 		Stage:      stage,
 		Region:     region,
 		ResourceID: resourceID,
 		Message:    err.Error(),
 	}
+
+	var serviceError common.ServiceError
+	if errors.As(err, &serviceError) {
+		item.HTTPStatusCode = serviceError.GetHTTPStatusCode()
+		item.ServiceCode = serviceError.GetCode()
+		item.OPCRequestID = serviceError.GetOpcRequestID()
+		retryable := common.IsErrorRetryableByDefault(err)
+		item.Retryable = &retryable
+		item.Diagnosis, item.SuggestedActions = diagnoseServiceError(stage, item)
+	}
+
+	var richError common.ServiceErrorRichInfo
+	if errors.As(err, &richError) {
+		item.TargetService = richError.GetTargetService()
+		item.OperationName = richError.GetOperationName()
+		item.RequestTimestamp = richError.GetTimestamp().UTC().Format(time.RFC3339)
+		item.RequestEndpoint = richError.GetRequestTarget()
+		item.ClientVersion = richError.GetClientVersion()
+		item.TroubleshootingLink = richError.GetErrorTroubleshootingLink()
+		item.OperationReferenceLink = richError.GetOperationReferenceLink()
+	}
+	return item
+}
+
+func collectionErrorForRef(stage string, ref resourceRef, err error) model.CollectionError {
+	item := collectionError(stage, ref.Region, ref.ID, err)
+	item.SearchCompartmentID = ref.CompartmentID
+	item.SearchDisplayName = ref.DisplayName
+	item.SearchLifecycleState = ref.LifecycleState
+	item.SearchTimeCreated = ref.TimeCreated
+	return item
+}
+
+func diagnoseServiceError(stage string, item model.CollectionError) (string, []string) {
+	if item.HTTPStatusCode != 404 || !strings.EqualFold(item.ServiceCode, "NotAuthorizedOrNotFound") {
+		return "", nil
+	}
+
+	diagnosis := "OCI uses this 404 when the resource does not exist or the caller is not authorized to access it. The default OCI retry policy classifies it as non-retryable, so repeating the unchanged request is not expected to resolve it."
+	actions := []string{
+		"Verify that the resource OCID still exists, is in this tenancy and region, and has not been terminated or moved.",
+		"Verify the signing user, instance principal, or resource principal and its effective policies in the resource compartment.",
+		"If --tenancy-id was supplied, verify that it is the tenancy represented by the authentication provider.",
+		"Retry after allowing for OCI Search index consistency; if the direct Get still fails, retain the OPC request ID for Oracle Support.",
+	}
+	if stage == "get_autonomous_database" {
+		diagnosis += " GetAutonomousDatabase and visibility of autonomous-database results in OCI Search both require AUTONOMOUS_DATABASE_INSPECT. If Search found the OCID but Get immediately returned this response, a stale Search entry after deletion or movement is a leading explanation; a changed, compartment-scoped, or conditional IAM grant remains possible."
+		actions[1] = "Verify that the principal has `inspect autonomous-databases` in the database compartment (or tenancy), including any identity-domain, dynamic-group, tag, and policy conditions."
+	}
+	return diagnosis, actions
+}
+
+func logCollectionWarning(output io.Writer, operation string, item model.CollectionError) {
+	if item.HTTPStatusCode == 0 {
+		fmt.Fprintf(output, "warning: %s failed in %s for %s: %s\n",
+			operation, item.Region, item.ResourceID, item.Message)
+		return
+	}
+	retryable := "unknown"
+	if item.Retryable != nil {
+		retryable = fmt.Sprintf("%t", *item.Retryable)
+	}
+	fmt.Fprintf(output,
+		"warning: %s failed in %s for %s: HTTP %d %s; retryable=%s; opc-request-id=%s; full diagnostics are in the failed-requests report\n",
+		operation,
+		item.Region,
+		item.ResourceID,
+		item.HTTPStatusCode,
+		item.ServiceCode,
+		retryable,
+		item.OPCRequestID,
+	)
 }
 
 func retryMetadata() common.RequestMetadata {

@@ -22,10 +22,27 @@ type Region struct {
 }
 
 type CollectionError struct {
-	Stage      string `json:"stage"`
-	Region     string `json:"region,omitempty"`
-	ResourceID string `json:"resource_id,omitempty"`
-	Message    string `json:"message"`
+	Stage                  string   `json:"stage"`
+	Region                 string   `json:"region,omitempty"`
+	ResourceID             string   `json:"resource_id,omitempty"`
+	SearchCompartmentID    string   `json:"search_compartment_id,omitempty"`
+	SearchDisplayName      string   `json:"search_display_name,omitempty"`
+	SearchLifecycleState   string   `json:"search_lifecycle_state,omitempty"`
+	SearchTimeCreated      string   `json:"search_time_created,omitempty"`
+	HTTPStatusCode         int      `json:"http_status_code,omitempty"`
+	ServiceCode            string   `json:"service_code,omitempty"`
+	OPCRequestID           string   `json:"opc_request_id,omitempty"`
+	TargetService          string   `json:"target_service,omitempty"`
+	OperationName          string   `json:"operation_name,omitempty"`
+	RequestTimestamp       string   `json:"request_timestamp,omitempty"`
+	RequestEndpoint        string   `json:"request_endpoint,omitempty"`
+	ClientVersion          string   `json:"client_version,omitempty"`
+	Retryable              *bool    `json:"retryable,omitempty"`
+	Diagnosis              string   `json:"diagnosis,omitempty"`
+	SuggestedActions       []string `json:"suggested_actions,omitempty"`
+	TroubleshootingLink    string   `json:"troubleshooting_link,omitempty"`
+	OperationReferenceLink string   `json:"operation_reference_link,omitempty"`
+	Message                string   `json:"message"`
 }
 
 type DatabaseSummary struct {
@@ -69,6 +86,7 @@ type DatabaseSummary struct {
 	IsLocalDataGuardEnabled        *bool          `json:"is_local_data_guard_enabled,omitempty"`
 	IsRemoteDataGuardEnabled       *bool          `json:"is_remote_data_guard_enabled,omitempty"`
 	TimeCreated                    string         `json:"time_created,omitempty"`
+	NBCreatedSince                 *int64         `json:"nb_created_since,omitempty"`
 	OracleTags                     OracleTagAudit `json:"oracle_tags"`
 }
 
@@ -159,6 +177,8 @@ func NewSummaryAt(region string, adb database.AutonomousDatabase, asOf time.Time
 	}
 	if adb.TimeCreated != nil {
 		summary.TimeCreated = adb.TimeCreated.UTC().Format(time.RFC3339)
+		ageDays := int64(asOf.UTC().Sub(adb.TimeCreated.UTC()) / (24 * time.Hour))
+		summary.NBCreatedSince = &ageDays
 	}
 	return summary
 }

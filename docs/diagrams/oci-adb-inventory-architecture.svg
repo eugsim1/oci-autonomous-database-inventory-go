@@ -84,19 +84,20 @@
   <text x="427" y="388" text-anchor="middle" class="h">Collector + normalizer</text>
   <text x="427" y="415" text-anchor="middle" class="t">Complete SDK objects</text>
   <text x="427" y="438" text-anchor="middle" class="t">Exact sizes and totals</text>
-  <text x="427" y="461" text-anchor="middle" class="t">Oracle-Tags age calculation</text>
-  <text x="427" y="484" text-anchor="middle" class="t">Explicit partial errors</text>
+  <text x="427" y="461" text-anchor="middle" class="t">OCI + Oracle-Tags age</text>
+  <text x="427" y="484" text-anchor="middle" class="t">Structured partial errors</text>
   <rect x="295" y="570" width="265" height="130" rx="12" fill="#f4f1ed" stroke="#8b7e74" stroke-width="2"/>
   <text x="427" y="604" text-anchor="middle" class="h">Atomic report writer</text>
   <text x="427" y="631" text-anchor="middle" class="t">Shared UTC timestamp</text>
   <text x="427" y="654" text-anchor="middle" class="t">Restricted permissions</text>
   <text x="427" y="677" text-anchor="middle" class="t">Temporary file + rename</text>
-  <rect x="45" y="565" width="205" height="145" rx="12" fill="#e5f2ea" stroke="#3f7d5a" stroke-width="2"/>
-  <text x="147" y="598" text-anchor="middle" class="h">Timestamped reports</text>
-  <text x="147" y="625" text-anchor="middle" class="t">Combined JSON</text>
-  <text x="147" y="647" text-anchor="middle" class="t">Autonomous DB CSV</text>
-  <text x="147" y="669" text-anchor="middle" class="t">Compute + volume CSV</text>
-  <text x="147" y="691" text-anchor="middle" class="t">Markdown summary</text>
+  <rect x="45" y="555" width="205" height="170" rx="12" fill="#e5f2ea" stroke="#3f7d5a" stroke-width="2"/>
+  <text x="147" y="588" text-anchor="middle" class="h">Timestamped reports</text>
+  <text x="147" y="615" text-anchor="middle" class="t">Combined JSON</text>
+  <text x="147" y="637" text-anchor="middle" class="t">Autonomous DB CSV</text>
+  <text x="147" y="659" text-anchor="middle" class="t">Compute + volume CSV</text>
+  <text x="147" y="681" text-anchor="middle" class="t">Failed requests CSV</text>
+  <text x="147" y="703" text-anchor="middle" class="t">Markdown summary</text>
 
   <path d="M250 198H295" class="edge" stroke="#41729f" marker-end="url(#arrowBlue)"/>
   <path d="M515 198H585V218H615" class="edge" stroke="#c74634" marker-end="url(#arrowRed)"/>
@@ -117,5 +118,5 @@
   <rect x="235" y="828" width="1130" height="74" rx="9" fill="#fff8df" stroke="#d6b656"/>
   <text x="260" y="858" class="h">Scope and accuracy contract</text>
   <text x="260" y="883" class="t">Read-only calls. Search is regional and permission-filtered. Missing volume details retain the attachment, leave size unknown, and mark totals incomplete.</text>
-  <text x="48" y="958" class="small">Editable source: diagrams.net (.drawio) | OCI service topology | Report schema v2.0</text>
+  <text x="48" y="958" class="small">Editable source: diagrams.net (.drawio) | OCI service topology | Report schema v2.1</text>
 </svg>

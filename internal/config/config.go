@@ -50,7 +50,7 @@ func Parse(args []string, output io.Writer) (Config, error) {
 	fs.StringVar(&cfg.TenancyOCID, "tenancy-id", "", "tenancy OCID; empty resolves it from the authentication provider")
 	fs.StringVar(&cfg.BootstrapRegion, "bootstrap-region", "", "region for the initial Identity call; empty uses the provider region")
 	fs.StringVar(&regions, "regions", "", "comma-separated READY subscribed regions; empty scans all")
-	fs.StringVar(&cfg.OutputDir, "output-dir", "reports", "directory for timestamped JSON, two CSV files, and Markdown reports")
+	fs.StringVar(&cfg.OutputDir, "output-dir", "reports", "directory for timestamped JSON, three CSV files, and Markdown reports")
 	fs.IntVar(&cfg.Workers, "workers", workers, "maximum concurrent OCI API operations")
 	fs.DurationVar(&cfg.Timeout, "timeout", 30*time.Minute, "overall collection timeout")
 	fs.BoolVar(&cfg.Strict, "strict", false, "return a non-zero status when any regional or resource lookup fails")

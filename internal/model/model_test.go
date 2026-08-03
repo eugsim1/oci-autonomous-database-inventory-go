@@ -31,6 +31,23 @@ func TestNewSummaryECPUAndGBStorage(t *testing.T) {
 	}
 }
 
+func TestNewSummaryCalculatesDaysSinceOCITimeCreated(t *testing.T) {
+	created := time.Date(2026, 7, 1, 10, 11, 12, 0, time.UTC)
+	asOf := time.Date(2026, 7, 29, 22, 11, 11, 0, time.UTC)
+	adb := database.AutonomousDatabase{
+		Id:          common.String("ocid1.autonomousdatabase.oc1.eu-paris-1.example"),
+		TimeCreated: &common.SDKTime{Time: created},
+	}
+
+	got := NewSummaryAt("eu-paris-1", adb, asOf)
+	if got.TimeCreated != "2026-07-01T10:11:12Z" {
+		t.Fatalf("TimeCreated = %q", got.TimeCreated)
+	}
+	if got.NBCreatedSince == nil || *got.NBCreatedSince != 28 {
+		t.Fatalf("NBCreatedSince = %v, want 28", got.NBCreatedSince)
+	}
+}
+
 func TestOracleTagAuditUsesCreatedOnAndCreatedBy(t *testing.T) {
 	asOf := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
 	tags := map[string]map[string]interface{}{

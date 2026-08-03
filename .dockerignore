@@ -1,4 +1,16 @@
 .git
 bin
 reports
+.gocache
+.gomodcache
+.gopath
+.oci
+.env
+.env.*
+**/.oci
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*private_key*
 *.md

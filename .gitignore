@@ -2,6 +2,9 @@
 /bin/
 *.exe
 *.test
+.gocache/
+.gomodcache/
+.gopath/
 
 # Generated reports can contain tenancy metadata.
 /reports/

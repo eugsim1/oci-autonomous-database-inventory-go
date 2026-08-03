@@ -18,6 +18,7 @@ type Paths struct {
 	JSON                  string
 	AutonomousDatabaseCSV string
 	ComputeInstanceCSV    string
+	FailedRequestsCSV     string
 	Markdown              string
 }
 
@@ -32,6 +33,7 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 		JSON:                  filepath.Join(outputDir, base+".json"),
 		AutonomousDatabaseCSV: filepath.Join(outputDir, base+"-autonomous-databases.csv"),
 		ComputeInstanceCSV:    filepath.Join(outputDir, base+"-compute-instances.csv"),
+		FailedRequestsCSV:     filepath.Join(outputDir, base+"-failed-requests.csv"),
 		Markdown:              filepath.Join(outputDir, base+".md"),
 	}
 
@@ -47,11 +49,16 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 	if err != nil {
 		return Paths{}, err
 	}
+	failedRequestsCSVData, err := marshalFailedRequestsCSV(report)
+	if err != nil {
+		return Paths{}, err
+	}
 	markdownData := marshalMarkdown(
 		report,
 		filepath.Base(paths.JSON),
 		filepath.Base(paths.AutonomousDatabaseCSV),
 		filepath.Base(paths.ComputeInstanceCSV),
+		filepath.Base(paths.FailedRequestsCSV),
 	)
 
 	for _, item := range []struct {
@@ -61,6 +68,7 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 		{paths.JSON, jsonData},
 		{paths.AutonomousDatabaseCSV, databaseCSVData},
 		{paths.ComputeInstanceCSV, computeCSVData},
+		{paths.FailedRequestsCSV, failedRequestsCSVData},
 		{paths.Markdown, markdownData},
 	} {
 		if err := writeFileAtomically(item.path, item.data); err != nil {
@@ -96,6 +104,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 		"database_edition", "role", "open_mode", "permission_level", "subnet_ocid",
 		"private_endpoint", "public_endpoint", "access_control_enabled", "mtls_required",
 		"local_data_guard_enabled", "remote_data_guard_enabled", "time_created",
+		"nb_created_since",
 		"oracle_created_on_raw", "oracle_created_on_utc", "age_days_as_of_report",
 		"oracle_created_by", "created_on_tag_status",
 	}
@@ -148,6 +157,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 			boolPointer(s.IsLocalDataGuardEnabled),
 			boolPointer(s.IsRemoteDataGuardEnabled),
 			s.TimeCreated,
+			int64Pointer(s.NBCreatedSince),
 			s.OracleTags.CreatedOnRaw,
 			s.OracleTags.CreatedOnUTC,
 			int64Pointer(s.OracleTags.AgeDaysAsOfReport),
@@ -161,6 +171,57 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 	writer.Flush()
 	if err := writer.Error(); err != nil {
 		return nil, fmt.Errorf("flush CSV report: %w", err)
+	}
+	return output.Bytes(), nil
+}
+
+func marshalFailedRequestsCSV(report model.Report) ([]byte, error) {
+	var output bytes.Buffer
+	writer := csv.NewWriter(&output)
+	header := []string{
+		"generated_at", "tenancy_ocid", "authentication", "stage", "region", "resource_ocid",
+		"search_compartment_ocid", "search_display_name", "search_lifecycle_state", "search_time_created",
+		"http_status_code", "service_code", "retryable", "target_service", "operation_name",
+		"opc_request_id", "request_timestamp", "request_endpoint", "client_version", "diagnosis",
+		"suggested_actions", "troubleshooting_link", "operation_reference_link", "message",
+	}
+	if err := writer.Write(header); err != nil {
+		return nil, fmt.Errorf("write failed-requests CSV header: %w", err)
+	}
+	for _, item := range report.Errors {
+		row := []string{
+			report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			report.TenancyOCID,
+			report.Authentication,
+			item.Stage,
+			item.Region,
+			item.ResourceID,
+			item.SearchCompartmentID,
+			item.SearchDisplayName,
+			item.SearchLifecycleState,
+			item.SearchTimeCreated,
+			intValue(item.HTTPStatusCode),
+			item.ServiceCode,
+			boolPointer(item.Retryable),
+			item.TargetService,
+			item.OperationName,
+			item.OPCRequestID,
+			item.RequestTimestamp,
+			item.RequestEndpoint,
+			item.ClientVersion,
+			item.Diagnosis,
+			strings.Join(item.SuggestedActions, " | "),
+			item.TroubleshootingLink,
+			item.OperationReferenceLink,
+			item.Message,
+		}
+		if err := writer.Write(row); err != nil {
+			return nil, fmt.Errorf("write failed-requests CSV row for %s: %w", item.ResourceID, err)
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("flush failed-requests CSV report: %w", err)
 	}
 	return output.Bytes(), nil
 }
@@ -294,7 +355,13 @@ type regionTotal struct {
 	Errors                 int
 }
 
-func marshalMarkdown(report model.Report, jsonName, databaseCSVName, computeCSVName string) []byte {
+func marshalMarkdown(
+	report model.Report,
+	jsonName string,
+	databaseCSVName string,
+	computeCSVName string,
+	failedRequestsCSVName string,
+) []byte {
 	totals := map[string]*regionTotal{}
 	for _, region := range report.SubscribedRegions {
 		if region.Scanned {
@@ -361,6 +428,8 @@ func marshalMarkdown(report model.Report, jsonName, databaseCSVName, computeCSVN
 	fmt.Fprintf(&output, "- Full configuration: [%s](%s)\n", jsonName, jsonName)
 	fmt.Fprintf(&output, "- Autonomous Database CSV: [%s](%s)\n", databaseCSVName, databaseCSVName)
 	fmt.Fprintf(&output, "- Compute and attached-volume CSV: [%s](%s)\n", computeCSVName, computeCSVName)
+	fmt.Fprintf(&output, "- Failed-request diagnostics CSV: [%s](%s)\n",
+		failedRequestsCSVName, failedRequestsCSVName)
 	fmt.Fprintln(&output)
 	fmt.Fprintln(&output, "> The JSON file contains complete SDK objects returned by the Database, Compute,")
 	fmt.Fprintln(&output, "> and Block Volume APIs and can contain sensitive tenancy, network, tag, ACL,")
@@ -435,11 +504,11 @@ func marshalMarkdown(report model.Report, jsonName, databaseCSVName, computeCSVN
 	fmt.Fprintln(&output)
 	fmt.Fprintln(&output, "## Autonomous Databases")
 	fmt.Fprintln(&output)
-	fmt.Fprintln(&output, "| Region | Display name | DB name | State | Workload | Model | Compute | ECPUs | OCPUs | Storage | Oracle-Tags.CreatedOn | Age (days) | Created by |")
-	fmt.Fprintln(&output, "|---|---|---|---|---|---|---:|---:|---:|---:|---|---:|---|")
+	fmt.Fprintln(&output, "| Region | Display name | DB name | State | Workload | Model | Compute | ECPUs | OCPUs | Storage | OCI time_created | nb_created_since | Oracle-Tags.CreatedOn | Tag age (days) | Created by |")
+	fmt.Fprintln(&output, "|---|---|---|---|---|---|---:|---:|---:|---:|---|---:|---|---:|---|")
 	for _, record := range report.Databases {
 		s := record.Summary
-		fmt.Fprintf(&output, "| %s | %s | `%s` | %s | %s | %s | %s | %s | %s | %s | `%s` | %s | %s |\n",
+		fmt.Fprintf(&output, "| %s | %s | `%s` | %s | %s | %s | %s | %s | %s | %s | `%s` | %s | `%s` | %s | %s |\n",
 			markdownEscape(s.Region),
 			markdownEscape(s.DisplayName),
 			markdownEscape(s.DBName),
@@ -450,6 +519,8 @@ func marshalMarkdown(report model.Report, jsonName, databaseCSVName, computeCSVN
 			displayFloat(s.ECPUs),
 			displayFloat(s.OCPUs),
 			displayStorage(s),
+			markdownEscape(s.TimeCreated),
+			displayInt64(s.NBCreatedSince),
 			markdownEscape(s.OracleTags.CreatedOnRaw),
 			displayInt64(s.OracleTags.AgeDaysAsOfReport),
 			markdownEscape(s.OracleTags.CreatedBy),
@@ -460,14 +531,20 @@ func marshalMarkdown(report model.Report, jsonName, databaseCSVName, computeCSVN
 		fmt.Fprintln(&output)
 		fmt.Fprintln(&output, "## Collection errors")
 		fmt.Fprintln(&output)
-		fmt.Fprintln(&output, "| Stage | Region | Resource | Error |")
-		fmt.Fprintln(&output, "|---|---|---|---|")
+		fmt.Fprintln(&output, "The linked failed-request CSV contains the full SDK request metadata, diagnosis, suggested actions, and original error text.")
+		fmt.Fprintln(&output)
+		fmt.Fprintln(&output, "| Stage | Region | Resource | HTTP | Code | Retryable | OPC request ID | Diagnosis |")
+		fmt.Fprintln(&output, "|---|---|---|---:|---|---|---|---|")
 		for _, item := range report.Errors {
-			fmt.Fprintf(&output, "| %s | %s | `%s` | %s |\n",
+			fmt.Fprintf(&output, "| %s | %s | `%s` | %s | %s | %s | `%s` | %s |\n",
 				markdownEscape(item.Stage),
 				markdownEscape(item.Region),
 				markdownEscape(item.ResourceID),
-				markdownEscape(item.Message),
+				intValue(item.HTTPStatusCode),
+				markdownEscape(item.ServiceCode),
+				boolPointer(item.Retryable),
+				markdownEscape(item.OPCRequestID),
+				markdownEscape(item.Diagnosis),
 			)
 		}
 	}
@@ -541,6 +618,13 @@ func intPointer(value *int) string {
 		return ""
 	}
 	return strconv.Itoa(*value)
+}
+
+func intValue(value int) string {
+	if value == 0 {
+		return ""
+	}
+	return strconv.Itoa(value)
 }
 
 func int64Pointer(value *int64) string {

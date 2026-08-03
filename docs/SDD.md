@@ -18,6 +18,8 @@ provides an explicit subset.
 - Use authoritative service APIs for configuration and storage sizes.
 - Preserve complete SDK responses in canonical JSON.
 - Make `Oracle-Tags.CreatedOn` provenance explicit and independently auditable.
+- Calculate Autonomous Database `nb_created_since` from the authoritative OCI
+  `timeCreated` field at the fixed report timestamp.
 - Never present a partial storage total as complete.
 - Continue across independent failures and make every error visible.
 - Bound concurrency and total runtime.
@@ -56,8 +58,9 @@ query autonomousdatabase resources
 query instance resources
 ```
 
-Results are de-duplicated by `(region, OCID)`. Search is used only to discover
-resource identifiers.
+Results are de-duplicated by `(region, OCID)`. Search is used for discovery;
+its compartment, display name, lifecycle, and creation timestamp are retained
+for diagnosing a later detail-lookup failure.
 
 ### Autonomous Database enrichment
 
@@ -101,16 +104,19 @@ namespace and its `CreatedOn` and `CreatedBy` keys.
 - label the value `parsed`, `missing`, `invalid`, or `unavailable` when a
   volume detail call failed.
 
-OCI `timeCreated` is stored separately. It is never used as a silent fallback
-for the requested tag-derived age.
+OCI `timeCreated` is stored separately. For Autonomous Databases it is used to
+calculate `nb_created_since` as complete elapsed 24-hour periods at
+`report.generated_at`. It is never used as a silent fallback for the requested
+tag-derived age.
 
 ### Report writer
 
-The writer creates four files with one shared UTC timestamp:
+The writer creates five files with one shared UTC timestamp:
 
 - canonical combined JSON;
 - Autonomous Database CSV;
 - Compute/attached-volume CSV;
+- failed-request diagnostics CSV;
 - Markdown summary.
 
 Each file is written with restricted permissions to a temporary file in the
@@ -132,7 +138,7 @@ The root context applies the configured timeout to the complete operation.
 
 ## 5. Data model
 
-The JSON schema version is `2.0`.
+The JSON schema version is `2.1`.
 
 `Report` contains:
 
@@ -179,6 +185,13 @@ The following are retained as `CollectionError` values:
 - boot/block attachment list failure;
 - boot/block volume detail failure.
 
+OCI SDK service errors are normalized into HTTP status, service code,
+retryability, operation, request endpoint/timestamp, client version, OPC request
+ID, documentation links, diagnosis, and suggested actions. A dedicated CSV
+contains the complete structured failure record. In particular, a 404
+`NotAuthorizedOrNotFound` is described as an ambiguous missing-resource or IAM
+failure and is not treated as retryable by the default SDK policy.
+
 When a volume-detail call fails, the attachment remains in JSON/CSV with an
 unknown size. In strict mode, partial reports are still written before the CLI
 returns a non-zero status.
@@ -205,5 +218,6 @@ go build -trimpath ./cmd/oci-adb-inventory
 ```
 
 Unit tests cover region selection, ECPU/OCPU normalization, exact storage
-totals, Oracle tag parsing and age calculation, JSON preservation, both CSV
-formats, Markdown generation, and timestamped filenames.
+totals, OCI and Oracle tag age calculation, rich OCI error extraction, JSON
+preservation, all three CSV formats, Markdown generation, and timestamped
+filenames.

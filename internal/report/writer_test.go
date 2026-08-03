@@ -26,6 +26,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		ComputeModel:         database.AutonomousDatabaseComputeModelEcpu,
 		ComputeCount:         common.Float32(8),
 		DataStorageSizeInGBs: common.Int(1024),
+		TimeCreated: &common.SDKTime{Time: time.Date(
+			2026, 7, 1, 10, 11, 12, 0, time.UTC,
+		)},
 		DefinedTags: map[string]map[string]interface{}{
 			"Oracle-Tags": {
 				"CreatedOn": "2026-07-09T10:11:12Z",
@@ -34,7 +37,7 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		},
 	}
 	report := model.Report{
-		SchemaVersion:  "2.0",
+		SchemaVersion:  "2.1",
 		GeneratedAt:    generated,
 		TenancyOCID:    "ocid1.tenancy.oc1..example",
 		Authentication: "api_key",
@@ -95,6 +98,18 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 			generated,
 		),
 	}
+	retryable := false
+	report.Errors = []model.CollectionError{{
+		Stage:          "get_autonomous_database",
+		Region:         "eu-paris-1",
+		ResourceID:     "ocid1.autonomousdatabase.oc1.eu-paris-1.missing",
+		HTTPStatusCode: 404,
+		ServiceCode:    "NotAuthorizedOrNotFound",
+		OPCRequestID:   "example-opc-request-id",
+		Retryable:      &retryable,
+		Diagnosis:      "The resource is missing or inaccessible.",
+		Message:        "Authorization failed or requested resource not found.",
+	}}
 	report.Finalize()
 
 	paths, err := Write(report, t.TempDir())
@@ -105,6 +120,7 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		paths.JSON,
 		paths.AutonomousDatabaseCSV,
 		paths.ComputeInstanceCSV,
+		paths.FailedRequestsCSV,
 		paths.Markdown,
 	} {
 		if !strings.Contains(filepath.Base(path), "20260729T101112Z") {
@@ -155,6 +171,13 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if !strings.Contains(strings.Join(rows[1], ","), "database-admin@example.com") {
 		t.Fatalf("Autonomous Database CSV does not contain Oracle-Tags.CreatedBy: %#v", rows[1])
 	}
+	nbCreatedSinceIndex := columnIndex(rows[0], "nb_created_since")
+	if nbCreatedSinceIndex == -1 {
+		t.Fatalf("Autonomous Database CSV is missing nb_created_since: %#v", rows[0])
+	}
+	if rows[1][nbCreatedSinceIndex] != "28" {
+		t.Fatalf("nb_created_since = %q, want 28", rows[1][nbCreatedSinceIndex])
+	}
 
 	computeCSVFile, err := os.Open(paths.ComputeInstanceCSV)
 	if err != nil {
@@ -178,4 +201,35 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		!strings.Contains(strings.Join(computeRows[2], ","), "250") {
 		t.Fatalf("Compute CSV does not contain exact boot and block volume sizes: %#v", computeRows)
 	}
+
+	failedCSVFile, err := os.Open(paths.FailedRequestsCSV)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer failedCSVFile.Close()
+	failedRows, err := csv.NewReader(failedCSVFile).ReadAll()
+	if err != nil {
+		t.Fatalf("invalid failed-requests CSV: %v", err)
+	}
+	if len(failedRows) != 2 || !strings.Contains(strings.Join(failedRows[1], ","), "example-opc-request-id") {
+		t.Fatalf("failed-requests CSV does not contain the structured failure: %#v", failedRows)
+	}
+
+	markdown, err := os.ReadFile(paths.Markdown)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(markdown), "nb_created_since") ||
+		!strings.Contains(string(markdown), filepath.Base(paths.FailedRequestsCSV)) {
+		t.Fatalf("Markdown does not document age and failed-request outputs: %s", markdown)
+	}
+}
+
+func columnIndex(header []string, name string) int {
+	for index, value := range header {
+		if value == name {
+			return index
+		}
+	}
+	return -1
 }
