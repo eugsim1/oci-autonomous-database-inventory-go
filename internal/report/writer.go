@@ -15,11 +15,13 @@ import (
 )
 
 type Paths struct {
-	JSON                  string
-	AutonomousDatabaseCSV string
-	ComputeInstanceCSV    string
-	FailedRequestsCSV     string
-	Markdown              string
+	JSON                    string
+	AutonomousDatabaseCSV   string
+	ComputeInstanceCSV      string
+	AttachedBootVolumesCSV  string
+	AttachedBlockVolumesCSV string
+	FailedRequestsCSV       string
+	Markdown                string
 }
 
 func Write(report model.Report, outputDir string) (Paths, error) {
@@ -30,11 +32,13 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 	stamp := report.GeneratedAt.UTC().Format("20060102T150405Z")
 	base := "oci-tenancy-inventory-" + stamp
 	paths := Paths{
-		JSON:                  filepath.Join(outputDir, base+".json"),
-		AutonomousDatabaseCSV: filepath.Join(outputDir, base+"-autonomous-databases.csv"),
-		ComputeInstanceCSV:    filepath.Join(outputDir, base+"-compute-instances.csv"),
-		FailedRequestsCSV:     filepath.Join(outputDir, base+"-failed-requests.csv"),
-		Markdown:              filepath.Join(outputDir, base+".md"),
+		JSON:                    filepath.Join(outputDir, base+".json"),
+		AutonomousDatabaseCSV:   filepath.Join(outputDir, base+"-autonomous-databases.csv"),
+		ComputeInstanceCSV:      filepath.Join(outputDir, base+"-compute-instances.csv"),
+		AttachedBootVolumesCSV:  filepath.Join(outputDir, base+"-attached-boot-volumes.csv"),
+		AttachedBlockVolumesCSV: filepath.Join(outputDir, base+"-attached-block-volumes.csv"),
+		FailedRequestsCSV:       filepath.Join(outputDir, base+"-failed-requests.csv"),
+		Markdown:                filepath.Join(outputDir, base+".md"),
 	}
 
 	jsonData, err := marshalJSON(report)
@@ -49,6 +53,14 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 	if err != nil {
 		return Paths{}, err
 	}
+	bootVolumesCSVData, err := marshalAttachedVolumesCSV(report, "boot")
+	if err != nil {
+		return Paths{}, err
+	}
+	blockVolumesCSVData, err := marshalAttachedVolumesCSV(report, "block")
+	if err != nil {
+		return Paths{}, err
+	}
 	failedRequestsCSVData, err := marshalFailedRequestsCSV(report)
 	if err != nil {
 		return Paths{}, err
@@ -58,6 +70,8 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 		filepath.Base(paths.JSON),
 		filepath.Base(paths.AutonomousDatabaseCSV),
 		filepath.Base(paths.ComputeInstanceCSV),
+		filepath.Base(paths.AttachedBootVolumesCSV),
+		filepath.Base(paths.AttachedBlockVolumesCSV),
 		filepath.Base(paths.FailedRequestsCSV),
 	)
 
@@ -68,6 +82,8 @@ func Write(report model.Report, outputDir string) (Paths, error) {
 		{paths.JSON, jsonData},
 		{paths.AutonomousDatabaseCSV, databaseCSVData},
 		{paths.ComputeInstanceCSV, computeCSVData},
+		{paths.AttachedBootVolumesCSV, bootVolumesCSVData},
+		{paths.AttachedBlockVolumesCSV, blockVolumesCSVData},
 		{paths.FailedRequestsCSV, failedRequestsCSVData},
 		{paths.Markdown, markdownData},
 	} {
@@ -347,6 +363,107 @@ func computeCSVRow(
 	)
 }
 
+func marshalAttachedVolumesCSV(report model.Report, volumeKind string) ([]byte, error) {
+	if volumeKind != "boot" && volumeKind != "block" {
+		return nil, fmt.Errorf("unsupported attached-volume report kind %q", volumeKind)
+	}
+
+	var output bytes.Buffer
+	writer := csv.NewWriter(&output)
+	header := []string{
+		"generated_at", "tenancy_ocid", "region", "instance_availability_domain",
+		"instance_compartment_ocid", "instance_ocid", "instance_display_name",
+		"instance_lifecycle_state", "instance_shape", "instance_oci_time_created",
+		"instance_oracle_created_on_raw", "instance_oracle_created_on_utc",
+		"instance_age_days_as_of_report", "instance_oracle_created_by",
+		"instance_created_by_user", "instance_created_on_tag_status",
+		"volume_kind", "volume_ocid", "volume_compartment_ocid", "volume_display_name",
+		"volume_availability_domain", "volume_lifecycle_state", "volume_size_gbs",
+		"volume_size_mbs", "volume_vpus_per_gb", "volume_auto_tuned_vpus_per_gb",
+		"volume_auto_tune_enabled", "volume_oci_time_created",
+		"volume_oracle_created_on_raw", "volume_oracle_created_on_utc",
+		"volume_age_days_as_of_report", "volume_oracle_created_by",
+		"volume_created_by_user", "volume_created_on_tag_status", "attachment_ocid",
+		"attachment_type", "attachment_lifecycle_state", "device", "is_read_only",
+		"is_shareable", "pv_encryption_in_transit_enabled",
+	}
+	if err := writer.Write(header); err != nil {
+		return nil, fmt.Errorf("write attached %s volumes CSV header: %w", volumeKind, err)
+	}
+
+	for _, record := range report.ComputeInstances {
+		switch volumeKind {
+		case "boot":
+			for _, volume := range record.BootVolumes {
+				if err := writer.Write(attachedVolumeCSVRow(report, record.Summary, volume.Summary)); err != nil {
+					return nil, fmt.Errorf("write attached boot volume CSV row for %s: %w", volume.Summary.ID, err)
+				}
+			}
+		case "block":
+			for _, volume := range record.BlockVolumes {
+				if err := writer.Write(attachedVolumeCSVRow(report, record.Summary, volume.Summary)); err != nil {
+					return nil, fmt.Errorf("write attached block volume CSV row for %s: %w", volume.Summary.ID, err)
+				}
+			}
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, fmt.Errorf("flush attached %s volumes CSV: %w", volumeKind, err)
+	}
+	return output.Bytes(), nil
+}
+
+func attachedVolumeCSVRow(
+	report model.Report,
+	instance model.ComputeInstanceSummary,
+	volume model.VolumeSummary,
+) []string {
+	return []string{
+		report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		report.TenancyOCID,
+		instance.Region,
+		instance.AvailabilityDomain,
+		instance.CompartmentID,
+		instance.ID,
+		instance.DisplayName,
+		instance.LifecycleState,
+		instance.Shape,
+		instance.OCITimeCreated,
+		instance.OracleTags.CreatedOnRaw,
+		instance.OracleTags.CreatedOnUTC,
+		int64Pointer(instance.OracleTags.AgeDaysAsOfReport),
+		instance.OracleTags.CreatedBy,
+		instance.OracleTags.CreatedByUser,
+		instance.OracleTags.CreatedOnTagStatus,
+		volume.Kind,
+		volume.ID,
+		volume.CompartmentID,
+		volume.DisplayName,
+		volume.AvailabilityDomain,
+		volume.LifecycleState,
+		int64Pointer(volume.SizeInGBs),
+		int64Pointer(volume.SizeInMBs),
+		int64Pointer(volume.VPUsPerGB),
+		int64Pointer(volume.AutoTunedVPUsPerGB),
+		boolPointer(volume.IsAutoTuneEnabled),
+		volume.OCITimeCreated,
+		volume.OracleTags.CreatedOnRaw,
+		volume.OracleTags.CreatedOnUTC,
+		int64Pointer(volume.OracleTags.AgeDaysAsOfReport),
+		volume.OracleTags.CreatedBy,
+		volume.OracleTags.CreatedByUser,
+		volume.OracleTags.CreatedOnTagStatus,
+		volume.AttachmentID,
+		volume.AttachmentType,
+		volume.AttachmentLifecycleState,
+		volume.Device,
+		boolPointer(volume.IsReadOnly),
+		boolPointer(volume.IsShareable),
+		boolPointer(volume.IsPvEncryptionInTransitEnabled),
+	}
+}
+
 type regionTotal struct {
 	Databases              int
 	ECPUs                  float64
@@ -365,6 +482,8 @@ func marshalMarkdown(
 	jsonName string,
 	databaseCSVName string,
 	computeCSVName string,
+	bootVolumesCSVName string,
+	blockVolumesCSVName string,
 	failedRequestsCSVName string,
 ) []byte {
 	totals := map[string]*regionTotal{}
@@ -433,6 +552,10 @@ func marshalMarkdown(
 	fmt.Fprintf(&output, "- Full configuration: [%s](%s)\n", jsonName, jsonName)
 	fmt.Fprintf(&output, "- Autonomous Database CSV: [%s](%s)\n", databaseCSVName, databaseCSVName)
 	fmt.Fprintf(&output, "- Compute and attached-volume CSV: [%s](%s)\n", computeCSVName, computeCSVName)
+	fmt.Fprintf(&output, "- Attached boot volumes CSV: [%s](%s)\n",
+		bootVolumesCSVName, bootVolumesCSVName)
+	fmt.Fprintf(&output, "- Attached block volumes CSV: [%s](%s)\n",
+		blockVolumesCSVName, blockVolumesCSVName)
 	fmt.Fprintf(&output, "- Failed-request diagnostics CSV: [%s](%s)\n",
 		failedRequestsCSVName, failedRequestsCSVName)
 	fmt.Fprintln(&output)

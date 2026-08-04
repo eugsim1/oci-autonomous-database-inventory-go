@@ -13,7 +13,7 @@ import (
 	"github.com/eugsim1/oci-autonomous-database-inventory-go/internal/report"
 )
 
-var version = "2.3.0"
+var version = "2.4.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))

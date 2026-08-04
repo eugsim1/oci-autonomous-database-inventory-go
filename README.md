@@ -49,9 +49,10 @@ fails, the known attachment is retained where possible, its size is left
 unknown, an error is recorded, and the instance's storage total is marked
 incomplete. The tool never reports a partial total as complete.
 
-The canonical JSON preserves complete SDK objects. Three CSV files (Autonomous
-Database, Compute/storage, and failed requests) and the Markdown report provide
-stable normalized views.
+The canonical JSON preserves complete SDK objects. Five CSV files (Autonomous
+Database, combined Compute/storage, attached boot volumes, attached block
+volumes, and failed requests) and the Markdown report provide stable normalized
+views.
 
 ## Architecture
 
@@ -88,7 +89,7 @@ Identity.ListRegionSubscriptions
         -> Compute.ListVolumeAttachments(instance)
            -> Blockstorage.GetVolume
      -> normalize sizes + Oracle-Tags audit fields
-        -> timestamped JSON + 3 CSV files + Markdown
+        -> timestamped JSON + 5 CSV files + Markdown
 ```
 
 OCI Search is region-scoped, so both paginated queries run in every selected
@@ -353,6 +354,8 @@ reports/
   oci-tenancy-inventory-20260729T101112Z.json
   oci-tenancy-inventory-20260729T101112Z-autonomous-databases.csv
   oci-tenancy-inventory-20260729T101112Z-compute-instances.csv
+  oci-tenancy-inventory-20260729T101112Z-attached-boot-volumes.csv
+  oci-tenancy-inventory-20260729T101112Z-attached-block-volumes.csv
   oci-tenancy-inventory-20260729T101112Z-failed-requests.csv
   oci-tenancy-inventory-20260729T101112Z.md
 ```
@@ -460,6 +463,13 @@ The Autonomous Database CSV contains one row per database, including
 attached boot or data volume, repeating the parent instance fields so it can be
 filtered or pivoted directly. An instance with no retrievable attachments still
 receives an instance-only row.
+
+The attached boot-volume CSV and attached block-volume CSV are dedicated
+one-row-per-volume inventories. Each includes the parent instance identity and
+state, exact volume sizes and performance settings, attachment details,
+`Oracle-Tags` creation audit fields, and `created_by_user`. A discovered
+attachment whose volume detail lookup failed is retained with the known
+attachment fields and blank unavailable volume details.
 
 The failed-request CSV always has a header and contains one row per collection
 error. For OCI service errors it preserves the HTTP status, service code,
@@ -603,7 +613,7 @@ Both use two stages:
    credentials.
 
 This is a one-shot batch program. It opens no listening port, needs no `EXPOSE`,
-and exits after writing five reports. `.dockerignore` prevents local reports,
+and exits after writing seven reports. `.dockerignore` prevents local reports,
 caches, OCI configuration, key formats, and environment files from entering the
 build context.
 
@@ -637,10 +647,10 @@ git clone https://github.com/eugsim1/oci-autonomous-database-inventory-go.git
 cd oci-autonomous-database-inventory-go
 podman build --pull=always \
   --file Containerfile \
-  --tag localhost/oci-adb-inventory:2.3.0 \
+  --tag localhost/oci-adb-inventory:2.4.0 \
   .
-podman image inspect localhost/oci-adb-inventory:2.3.0
-podman run --rm localhost/oci-adb-inventory:2.3.0 --version
+podman image inspect localhost/oci-adb-inventory:2.4.0
+podman run --rm localhost/oci-adb-inventory:2.4.0 --version
 ```
 
 The build host needs HTTPS access to the Go module proxy and both base-image
@@ -692,7 +702,7 @@ Optional variables and arguments:
 ```bash
 OCI_PROFILE=REPORTING \
 OUTPUT_DIR=/srv/oci-inventory/reports \
-APP_IMAGE=localhost/oci-adb-inventory:2.3.0 \
+APP_IMAGE=localhost/oci-adb-inventory:2.4.0 \
 ./scripts/run-podman-api-key.sh \
   --regions eu-frankfurt-1,eu-amsterdam-1 \
   --workers 8
@@ -711,7 +721,7 @@ podman run --rm \
   --env "HOME=$HOME" \
   --volume "$HOME/.oci:$HOME/.oci:ro,Z" \
   --volume "$PWD/reports:/reports:Z" \
-  localhost/oci-adb-inventory:2.3.0 \
+  localhost/oci-adb-inventory:2.4.0 \
   --auth api_key \
   --config-file "$HOME/.oci/config" \
   --profile DEFAULT \
@@ -758,7 +768,7 @@ password. The current recommended registry domain format is
 export OCI_REGION=eu-frankfurt-1
 export OCI_NAMESPACE='<tenancy-namespace>'
 export OCIR_REPOSITORY='oci-adb-inventory'
-export IMAGE_TAG='2.3.0'
+export IMAGE_TAG='2.4.0'
 export IMAGE="ocir.${OCI_REGION}.oci.oraclecloud.com/${OCI_NAMESPACE}/${OCIR_REPOSITORY}:${IMAGE_TAG}"
 read -rsp 'OCIR auth token: ' OCIR_AUTH_TOKEN; echo
 printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
@@ -766,7 +776,7 @@ printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
   --password-stdin \
   "ocir.${OCI_REGION}.oci.oraclecloud.com"
 unset OCIR_AUTH_TOKEN
-podman tag localhost/oci-adb-inventory:2.3.0 "$IMAGE"
+podman tag localhost/oci-adb-inventory:2.4.0 "$IMAGE"
 podman push "$IMAGE"
 podman logout "ocir.${OCI_REGION}.oci.oraclecloud.com"
 ```
@@ -800,7 +810,7 @@ image. OKE uses the dedicated `oke_workload_identity` mode described earlier.
 The same image can be built with Docker when a downstream system requires it:
 
 ```bash
-docker build --pull --file Dockerfile --tag oci-adb-inventory:2.3.0 .
+docker build --pull --file Dockerfile --tag oci-adb-inventory:2.4.0 .
 ```
 
 Podman and Docker are alternative local runtimes; Kubernetes/OKE later pulls the
@@ -826,7 +836,7 @@ Makefile                 composable dependency, QA, build, rebuild, and clean ta
 internal/config/         flags and validation
 internal/model/          canonical report model, tag audit, normalization
 internal/oci/            auth, Search, Database, Compute, Block Volume clients
-internal/report/         JSON, three CSV files, Markdown, atomic writes
+internal/report/         JSON, five CSV files, Markdown, atomic writes
 docs/                    SDD and editable diagrams
 policies/                IAM and resource-principal guidance
 scripts/                 hardened Podman run wrappers for Linux

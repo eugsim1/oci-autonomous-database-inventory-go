@@ -126,6 +126,8 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		paths.JSON,
 		paths.AutonomousDatabaseCSV,
 		paths.ComputeInstanceCSV,
+		paths.AttachedBootVolumesCSV,
+		paths.AttachedBlockVolumesCSV,
 		paths.FailedRequestsCSV,
 		paths.Markdown,
 	} {
@@ -227,6 +229,25 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		t.Fatalf("Compute CSV volume_created_by_user values are missing or incorrect: %#v", computeRows)
 	}
 
+	bootVolumeRows := readCSVRows(t, paths.AttachedBootVolumesCSV)
+	assertAttachedVolumeReport(
+		t,
+		bootVolumeRows,
+		"boot",
+		"ocid1.bootvolume.oc1.example",
+		"100",
+		"boot-admin@example.com",
+	)
+	blockVolumeRows := readCSVRows(t, paths.AttachedBlockVolumesCSV)
+	assertAttachedVolumeReport(
+		t,
+		blockVolumeRows,
+		"block",
+		"ocid1.volume.oc1.example",
+		"250",
+		"storage-admin@example.com",
+	)
+
 	failedCSVFile, err := os.Open(paths.FailedRequestsCSV)
 	if err != nil {
 		t.Fatal(err)
@@ -246,9 +267,63 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	}
 	if !strings.Contains(string(markdown), "nb_created_since") ||
 		!strings.Contains(string(markdown), "CreatedBy user") ||
+		!strings.Contains(string(markdown), filepath.Base(paths.AttachedBootVolumesCSV)) ||
+		!strings.Contains(string(markdown), filepath.Base(paths.AttachedBlockVolumesCSV)) ||
 		!strings.Contains(string(markdown), filepath.Base(paths.FailedRequestsCSV)) {
 		t.Fatalf("Markdown does not document age and failed-request outputs: %s", markdown)
 	}
+}
+
+func readCSVRows(t *testing.T, path string) [][]string {
+	t.Helper()
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	rows, err := csv.NewReader(file).ReadAll()
+	if err != nil {
+		t.Fatalf("invalid CSV %s: %v", path, err)
+	}
+	return rows
+}
+
+func assertAttachedVolumeReport(
+	t *testing.T,
+	rows [][]string,
+	wantKind string,
+	wantOCID string,
+	wantSizeGB string,
+	wantCreatedByUser string,
+) {
+	t.Helper()
+	if len(rows) != 2 {
+		t.Fatalf("attached %s volume CSV rows = %d, want 2", wantKind, len(rows))
+	}
+	if len(rows[1]) != len(rows[0]) {
+		t.Fatalf("attached %s volume CSV row has %d columns, header has %d",
+			wantKind, len(rows[1]), len(rows[0]))
+	}
+	for column, want := range map[string]string{
+		"volume_kind":            wantKind,
+		"volume_ocid":            wantOCID,
+		"volume_size_gbs":        wantSizeGB,
+		"volume_created_by_user": wantCreatedByUser,
+		"instance_ocid":          "ocid1.instance.oc1.eu-paris-1.example",
+	} {
+		index := columnIndex(rows[0], column)
+		if index == -1 || rows[1][index] != want {
+			t.Fatalf("attached %s volume CSV %s = %q, want %q; row=%#v",
+				wantKind, column, valueAt(rows[1], index), want, rows[1])
+		}
+	}
+}
+
+func valueAt(row []string, index int) string {
+	if index < 0 || index >= len(row) {
+		return ""
+	}
+	return row[index]
 }
 
 func columnIndex(header []string, name string) int {

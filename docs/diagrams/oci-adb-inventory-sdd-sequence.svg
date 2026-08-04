@@ -63,7 +63,7 @@
 
   <line x1="255" y1="925" x2="1302" y2="925" class="search" marker-end="url(#blue)"/><text x="778" y="916" text-anchor="middle" class="msg">14 normalize CPU/storage; calculate OCI + tag age days at generated_at</text>
   <line x1="1302" y1="968" x2="255" y2="968" class="ret" marker-end="url(#gray)"/><text x="778" y="959" text-anchor="middle" class="msg">15 schema v2.2 records + structured OCI errors</text>
-  <line x1="255" y1="1012" x2="1482" y2="1012" stroke="#3f7d5a" stroke-width="2" marker-end="url(#green)"/><text x="868" y="1003" text-anchor="middle" class="msg">16 write combined JSON + three CSV files + Markdown</text>
+  <line x1="255" y1="1012" x2="1482" y2="1012" stroke="#3f7d5a" stroke-width="2" marker-end="url(#green)"/><text x="868" y="1003" text-anchor="middle" class="msg">16 write combined JSON + five CSV files + Markdown</text>
   <line x1="1482" y1="1055" x2="85" y2="1055" stroke="#3f7d5a" stroke-width="2" marker-end="url(#green)"/><text x="783" y="1046" text-anchor="middle" class="msg">17 atomic report paths + counts + strict-mode status</text>
 
   <rect x="395" y="1100" width="850" height="60" rx="8" fill="#fff8df" stroke="#d6b656"/>

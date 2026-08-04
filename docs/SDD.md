@@ -117,11 +117,13 @@ tag-derived age.
 
 ### Report writer
 
-The writer creates five files with one shared UTC timestamp:
+The writer creates seven files with one shared UTC timestamp:
 
 - canonical combined JSON;
 - Autonomous Database CSV;
 - Compute/attached-volume CSV;
+- attached boot-volume CSV;
+- attached block-volume CSV;
 - failed-request diagnostics CSV;
 - Markdown summary.
 
@@ -225,5 +227,5 @@ go build -trimpath ./cmd/oci-adb-inventory
 
 Unit tests cover region selection, ECPU/OCPU normalization, exact storage
 totals, OCI and Oracle tag age calculation, rich OCI error extraction, JSON
-preservation, all three CSV formats, Markdown generation, and timestamped
+preservation, all five CSV formats, Markdown generation, and timestamped
 filenames.
