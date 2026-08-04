@@ -347,6 +347,22 @@ The tool rejects regions that are not subscribed or not `READY`.
 
 ## Reports
 
+Before collecting, confirm that the binary being executed is the current one:
+
+```bash
+command -v oci-adb-inventory || true
+./bin/oci-adb-inventory --version
+# expected: 2.5.0
+```
+
+Always invoke `./bin/oci-adb-inventory` after `./build.sh`. A bare
+`oci-adb-inventory` command can resolve to an older copy elsewhere in `PATH`.
+
+At startup the utility also prints `oci-adb-inventory version: 2.5.0`. After a
+successful run it prints the absolute or configured path of all seven output
+files, including both attached-volume CSV files. If those version/path lines
+are absent, a previous binary is being executed.
+
 A run at `2026-07-29T10:11:12Z` writes:
 
 ```text
@@ -362,7 +378,8 @@ reports/
 
 ### JSON
 
-The JSON report has schema version `2.2`. Each Compute record contains the
+The JSON report has schema version `2.3` and records `application_version` at
+the root. Each Compute record contains the
 complete instance object and nested boot/data volume objects:
 
 ```json
@@ -411,6 +428,8 @@ precedence:
 - `CreatedBy` is retained verbatim as `created_by`; the explicit
   `created_by_user` alias contains the same value and is intended for direct
   inventory filtering and reporting;
+- `created_by_source` identifies the exact source, for example
+  `defined_tags:Oracle_Tags.CreatedBy`;
 - `created_on_tag_status` is `parsed`, `missing`, `invalid`, or `unavailable`
   when a volume detail lookup failed.
 
@@ -424,6 +443,13 @@ tool does not infer an identity from unrelated tags or API metadata. For
 example, the value
 `oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com` is preserved
 verbatim in both `oracle_created_by` and `created_by_user`.
+
+As a compatibility fallback, the parser also accepts a flattened free-form tag
+whose key normalizes to `Oracle_Tags.CreatedBy`, such as
+`Oracle_Tags.CreatedBy`, `Oracle-Tags/CreatedBy`, or
+`Oracle Tags:CreatedBy`. Defined tags take precedence. The source column makes
+this visible as either `defined_tags:<namespace>.CreatedBy` or
+`freeform_tags:<key>`.
 
 OCI's separate API `timeCreated` field is retained as `oci_time_created` but is
 not substituted for a missing `Oracle-Tags.CreatedOn`. This makes the requested
@@ -476,6 +502,10 @@ state, exact volume sizes and performance settings, attachment details,
 `Oracle-Tags` creation audit fields, and `created_by_user`. A discovered
 attachment whose volume detail lookup failed is retained with the known
 attachment fields and blank unavailable volume details.
+
+Every CSV contains `application_version`; creation-attribution columns include
+`created_by_source`. This makes it possible to distinguish a missing tag from a
+stale executable or an accepted fallback tag representation.
 
 The failed-request CSV always has a header and contains one row per collection
 error. For OCI service errors it preserves the HTTP status, service code,
@@ -653,10 +683,10 @@ git clone https://github.com/eugsim1/oci-autonomous-database-inventory-go.git
 cd oci-autonomous-database-inventory-go
 podman build --pull=always \
   --file Containerfile \
-  --tag localhost/oci-adb-inventory:2.4.1 \
+  --tag localhost/oci-adb-inventory:2.5.0 \
   .
-podman image inspect localhost/oci-adb-inventory:2.4.1
-podman run --rm localhost/oci-adb-inventory:2.4.1 --version
+podman image inspect localhost/oci-adb-inventory:2.5.0
+podman run --rm localhost/oci-adb-inventory:2.5.0 --version
 ```
 
 The build host needs HTTPS access to the Go module proxy and both base-image
@@ -708,7 +738,7 @@ Optional variables and arguments:
 ```bash
 OCI_PROFILE=REPORTING \
 OUTPUT_DIR=/srv/oci-inventory/reports \
-APP_IMAGE=localhost/oci-adb-inventory:2.4.1 \
+APP_IMAGE=localhost/oci-adb-inventory:2.5.0 \
 ./scripts/run-podman-api-key.sh \
   --regions eu-frankfurt-1,eu-amsterdam-1 \
   --workers 8
@@ -727,7 +757,7 @@ podman run --rm \
   --env "HOME=$HOME" \
   --volume "$HOME/.oci:$HOME/.oci:ro,Z" \
   --volume "$PWD/reports:/reports:Z" \
-  localhost/oci-adb-inventory:2.4.1 \
+  localhost/oci-adb-inventory:2.5.0 \
   --auth api_key \
   --config-file "$HOME/.oci/config" \
   --profile DEFAULT \
@@ -774,7 +804,7 @@ password. The current recommended registry domain format is
 export OCI_REGION=eu-frankfurt-1
 export OCI_NAMESPACE='<tenancy-namespace>'
 export OCIR_REPOSITORY='oci-adb-inventory'
-export IMAGE_TAG='2.4.1'
+export IMAGE_TAG='2.5.0'
 export IMAGE="ocir.${OCI_REGION}.oci.oraclecloud.com/${OCI_NAMESPACE}/${OCIR_REPOSITORY}:${IMAGE_TAG}"
 read -rsp 'OCIR auth token: ' OCIR_AUTH_TOKEN; echo
 printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
@@ -782,7 +812,7 @@ printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
   --password-stdin \
   "ocir.${OCI_REGION}.oci.oraclecloud.com"
 unset OCIR_AUTH_TOKEN
-podman tag localhost/oci-adb-inventory:2.4.1 "$IMAGE"
+podman tag localhost/oci-adb-inventory:2.5.0 "$IMAGE"
 podman push "$IMAGE"
 podman logout "ocir.${OCI_REGION}.oci.oraclecloud.com"
 ```
@@ -816,7 +846,7 @@ image. OKE uses the dedicated `oke_workload_identity` mode described earlier.
 The same image can be built with Docker when a downstream system requires it:
 
 ```bash
-docker build --pull --file Dockerfile --tag oci-adb-inventory:2.4.1 .
+docker build --pull --file Dockerfile --tag oci-adb-inventory:2.5.0 .
 ```
 
 Podman and Docker are alternative local runtimes; Kubernetes/OKE later pulls the

@@ -97,6 +97,7 @@ type DatabaseRecord struct {
 
 type Report struct {
 	SchemaVersion        string                  `json:"schema_version"`
+	ApplicationVersion   string                  `json:"application_version"`
 	GeneratedAt          time.Time               `json:"generated_at"`
 	TenancyOCID          string                  `json:"tenancy_ocid"`
 	Authentication       string                  `json:"authentication"`
@@ -156,7 +157,7 @@ func NewSummaryAt(region string, adb database.AutonomousDatabase, asOf time.Time
 		IsMTLSConnectionRequired:    adb.IsMtlsConnectionRequired,
 		IsLocalDataGuardEnabled:     adb.IsLocalDataGuardEnabled,
 		IsRemoteDataGuardEnabled:    adb.IsRemoteDataGuardEnabled,
-		OracleTags:                  NewOracleTagAudit(adb.DefinedTags, asOf),
+		OracleTags:                  NewOracleTagAuditFromTags(adb.DefinedTags, adb.FreeformTags, asOf),
 	}
 
 	switch strings.ToUpper(summary.ComputeModel) {

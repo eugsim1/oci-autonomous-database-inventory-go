@@ -56,7 +56,7 @@ func NewCollector(cfg config.Config, logOutput io.Writer) (*Collector, error) {
 
 func (c *Collector) Collect(ctx context.Context) (model.Report, error) {
 	report := model.Report{
-		SchemaVersion:  "2.2",
+		SchemaVersion:  "2.3",
 		GeneratedAt:    time.Now().UTC(),
 		TenancyOCID:    c.tenancyID,
 		Authentication: c.cfg.AuthMode,

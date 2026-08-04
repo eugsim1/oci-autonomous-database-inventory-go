@@ -101,6 +101,24 @@ func TestOracleTagAuditPrefersCanonicalNamespace(t *testing.T) {
 	}
 }
 
+func TestOracleTagAuditAcceptsFlattenedFreeformTag(t *testing.T) {
+	got := NewOracleTagAuditFromTags(
+		nil,
+		map[string]string{
+			"Oracle_Tags.CreatedBy": "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com",
+		},
+		time.Now(),
+	)
+
+	want := "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com"
+	if got.CreatedByUser != want {
+		t.Fatalf("CreatedByUser = %q, want %q", got.CreatedByUser, want)
+	}
+	if got.CreatedBySource != "freeform_tags:Oracle_Tags.CreatedBy" {
+		t.Fatalf("CreatedBySource = %q", got.CreatedBySource)
+	}
+}
+
 func TestOracleTagAuditReportsInvalidCreatedOn(t *testing.T) {
 	got := NewOracleTagAudit(map[string]map[string]interface{}{
 		"oracle-tags": {

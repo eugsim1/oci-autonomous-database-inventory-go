@@ -37,10 +37,11 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		},
 	}
 	report := model.Report{
-		SchemaVersion:  "2.2",
-		GeneratedAt:    generated,
-		TenancyOCID:    "ocid1.tenancy.oc1..example",
-		Authentication: "api_key",
+		SchemaVersion:      "2.3",
+		ApplicationVersion: "2.5.0-test",
+		GeneratedAt:        generated,
+		TenancyOCID:        "ocid1.tenancy.oc1..example",
+		Authentication:     "api_key",
 		SearchQueries: map[string]string{
 			"autonomous_databases": model.AutonomousDatabaseSearchQuery,
 			"compute_instances":    model.ComputeInstanceSearchQuery,
@@ -63,8 +64,10 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		DefinedTags: map[string]map[string]interface{}{
 			"Oracle-Tags": {
 				"CreatedOn": "2026-07-19T10:11:12Z",
-				"CreatedBy": "alice@example.com",
 			},
+		},
+		FreeformTags: map[string]string{
+			"Oracle_Tags.CreatedBy": "alice@example.com",
 		},
 	}
 	bootAttachment := core.BootVolumeAttachment{
@@ -147,6 +150,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if err := json.Unmarshal(jsonData, &decoded); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
+	if decoded["application_version"] != "2.5.0-test" {
+		t.Fatalf("JSON application_version = %v", decoded["application_version"])
+	}
 	databases := decoded["databases"].([]interface{})
 	record := databases[0].(map[string]interface{})
 	summary := record["summary"].(map[string]interface{})
@@ -157,6 +163,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	}
 	if oracleTags["created_by_user"] != wantDatabaseCreatedBy {
 		t.Fatalf("JSON created_by_user = %v", oracleTags["created_by_user"])
+	}
+	if oracleTags["created_by_source"] != "defined_tags:Oracle_Tags.CreatedBy" {
+		t.Fatalf("JSON created_by_source = %v", oracleTags["created_by_source"])
 	}
 	configuration := record["configuration"].(map[string]interface{})
 	if configuration["computeModel"] != "ECPU" {
@@ -196,6 +205,11 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if createdByUserIndex == -1 || rows[1][createdByUserIndex] != wantDatabaseCreatedBy {
 		t.Fatalf("Autonomous Database CSV created_by_user is missing or incorrect: %#v", rows[1])
 	}
+	createdBySourceIndex := columnIndex(rows[0], "created_by_source")
+	if createdBySourceIndex == -1 || rows[1][createdBySourceIndex] != "defined_tags:Oracle_Tags.CreatedBy" {
+		t.Fatalf("Autonomous Database CSV created_by_source is missing or incorrect: %#v", rows[1])
+	}
+	assertCSVApplicationVersion(t, rows, "2.5.0-test")
 	nbCreatedSinceIndex := columnIndex(rows[0], "nb_created_since")
 	if nbCreatedSinceIndex == -1 {
 		t.Fatalf("Autonomous Database CSV is missing nb_created_since: %#v", rows[0])
@@ -230,6 +244,12 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if instanceCreatedByUserIndex == -1 || computeRows[1][instanceCreatedByUserIndex] != "alice@example.com" {
 		t.Fatalf("Compute CSV instance_created_by_user is missing or incorrect: %#v", computeRows[1])
 	}
+	instanceCreatedBySourceIndex := columnIndex(computeRows[0], "instance_created_by_source")
+	if instanceCreatedBySourceIndex == -1 ||
+		computeRows[1][instanceCreatedBySourceIndex] != "freeform_tags:Oracle_Tags.CreatedBy" {
+		t.Fatalf("Compute CSV instance_created_by_source is missing or incorrect: %#v", computeRows[1])
+	}
+	assertCSVApplicationVersion(t, computeRows, "2.5.0-test")
 	volumeCreatedByUserIndex := columnIndex(computeRows[0], "volume_created_by_user")
 	if volumeCreatedByUserIndex == -1 ||
 		computeRows[1][volumeCreatedByUserIndex] != "boot-admin@example.com" ||
@@ -268,17 +288,56 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	if len(failedRows) != 2 || !strings.Contains(strings.Join(failedRows[1], ","), "example-opc-request-id") {
 		t.Fatalf("failed-requests CSV does not contain the structured failure: %#v", failedRows)
 	}
+	assertCSVApplicationVersion(t, failedRows, "2.5.0-test")
 
 	markdown, err := os.ReadFile(paths.Markdown)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(markdown), "nb_created_since") ||
+		!strings.Contains(string(markdown), "Application version: `2.5.0-test`") ||
 		!strings.Contains(string(markdown), "CreatedBy user") ||
 		!strings.Contains(string(markdown), filepath.Base(paths.AttachedBootVolumesCSV)) ||
 		!strings.Contains(string(markdown), filepath.Base(paths.AttachedBlockVolumesCSV)) ||
 		!strings.Contains(string(markdown), filepath.Base(paths.FailedRequestsCSV)) {
 		t.Fatalf("Markdown does not document age and failed-request outputs: %s", markdown)
+	}
+}
+
+func TestWriteCreatesAttachedVolumeReportsWhenNoVolumesExist(t *testing.T) {
+	paths, err := Write(model.Report{
+		SchemaVersion:      "2.3",
+		ApplicationVersion: "2.5.0-test",
+		GeneratedAt:        time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC),
+		SearchQueries:      map[string]string{},
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	for kind, path := range map[string]string{
+		"boot":  paths.AttachedBootVolumesCSV,
+		"block": paths.AttachedBlockVolumesCSV,
+	} {
+		rows := readCSVRows(t, path)
+		if len(rows) != 1 {
+			t.Fatalf("empty attached %s volume CSV rows = %d, want header only", kind, len(rows))
+		}
+		if columnIndex(rows[0], "volume_ocid") == -1 ||
+			columnIndex(rows[0], "application_version") == -1 {
+			t.Fatalf("empty attached %s volume CSV is missing required headers: %#v", kind, rows[0])
+		}
+	}
+}
+
+func assertCSVApplicationVersion(t *testing.T, rows [][]string, want string) {
+	t.Helper()
+	if len(rows) < 2 {
+		t.Fatalf("CSV has %d rows, need a data row", len(rows))
+	}
+	index := columnIndex(rows[0], "application_version")
+	if index == -1 || rows[1][index] != want {
+		t.Fatalf("CSV application_version = %q, want %q", valueAt(rows[1], index), want)
 	}
 }
 
@@ -312,6 +371,7 @@ func assertAttachedVolumeReport(
 		t.Fatalf("attached %s volume CSV row has %d columns, header has %d",
 			wantKind, len(rows[1]), len(rows[0]))
 	}
+	assertCSVApplicationVersion(t, rows, "2.5.0-test")
 	for column, want := range map[string]string{
 		"volume_kind":            wantKind,
 		"volume_ocid":            wantOCID,

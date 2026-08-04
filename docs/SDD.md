@@ -100,6 +100,11 @@ underscore, and space namespace separators as equivalent, so `Oracle_Tags` is
 accepted. An exact case-insensitive `Oracle-Tags` match takes precedence when
 multiple equivalent namespaces are present.
 
+If the defined tag field is absent, the normalizer accepts a flattened
+free-form key whose separator-insensitive form is `Oracle_Tags.CreatedBy` or
+`Oracle_Tags.CreatedOn`. The output's `created_by_source` records whether the
+value came from `defined_tags` or `freeform_tags`; defined tags take precedence.
+
 `CreatedBy` is preserved as `created_by` and copied to the explicit
 `created_by_user` reporting alias. The CSV reports retain the legacy
 Oracle-prefixed columns and add resource-specific `*_created_by_user` columns.
@@ -149,7 +154,9 @@ The root context applies the configured timeout to the complete operation.
 
 ## 5. Data model
 
-The JSON schema version is `2.2`.
+The JSON schema version is `2.3`. `application_version` is recorded in the JSON
+root, every CSV row, the Markdown summary, and the command output so stale
+binaries are directly detectable.
 
 `Report` contains:
 

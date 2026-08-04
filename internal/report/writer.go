@@ -109,7 +109,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 	var output bytes.Buffer
 	writer := csv.NewWriter(&output)
 	header := []string{
-		"generated_at", "tenancy_ocid", "region", "compartment_ocid", "autonomous_database_ocid",
+		"generated_at", "application_version", "tenancy_ocid", "region", "compartment_ocid", "autonomous_database_ocid",
 		"display_name", "db_name", "workload", "lifecycle_state", "lifecycle_details", "db_version",
 		"infrastructure_type", "is_dedicated", "is_free_tier", "compute_model", "compute_count",
 		"ecpus", "ocpus", "legacy_cpu_core_count", "memory_per_compute_unit_gbs",
@@ -122,7 +122,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 		"local_data_guard_enabled", "remote_data_guard_enabled", "time_created",
 		"nb_created_since",
 		"oracle_created_on_raw", "oracle_created_on_utc", "age_days_as_of_report",
-		"oracle_created_by", "created_by_user", "created_on_tag_status",
+		"oracle_created_by", "created_by_user", "created_by_source", "created_on_tag_status",
 	}
 	if err := writer.Write(header); err != nil {
 		return nil, fmt.Errorf("write CSV header: %w", err)
@@ -132,6 +132,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 		s := record.Summary
 		row := []string{
 			report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			report.ApplicationVersion,
 			report.TenancyOCID,
 			s.Region,
 			s.CompartmentID,
@@ -179,6 +180,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 			int64Pointer(s.OracleTags.AgeDaysAsOfReport),
 			s.OracleTags.CreatedBy,
 			s.OracleTags.CreatedByUser,
+			s.OracleTags.CreatedBySource,
 			s.OracleTags.CreatedOnTagStatus,
 		}
 		if err := writer.Write(row); err != nil {
@@ -196,7 +198,7 @@ func marshalFailedRequestsCSV(report model.Report) ([]byte, error) {
 	var output bytes.Buffer
 	writer := csv.NewWriter(&output)
 	header := []string{
-		"generated_at", "tenancy_ocid", "authentication", "stage", "region", "resource_ocid",
+		"generated_at", "application_version", "tenancy_ocid", "authentication", "stage", "region", "resource_ocid",
 		"search_compartment_ocid", "search_display_name", "search_lifecycle_state", "search_time_created",
 		"http_status_code", "service_code", "retryable", "target_service", "operation_name",
 		"opc_request_id", "request_timestamp", "request_endpoint", "client_version", "diagnosis",
@@ -208,6 +210,7 @@ func marshalFailedRequestsCSV(report model.Report) ([]byte, error) {
 	for _, item := range report.Errors {
 		row := []string{
 			report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+			report.ApplicationVersion,
 			report.TenancyOCID,
 			report.Authentication,
 			item.Stage,
@@ -247,12 +250,12 @@ func marshalComputeCSV(report model.Report) ([]byte, error) {
 	var output bytes.Buffer
 	writer := csv.NewWriter(&output)
 	header := []string{
-		"generated_at", "tenancy_ocid", "region", "availability_domain", "compartment_ocid",
+		"generated_at", "application_version", "tenancy_ocid", "region", "availability_domain", "compartment_ocid",
 		"instance_ocid", "instance_display_name", "instance_lifecycle_state", "shape", "ocpus",
 		"vcpus", "memory_gbs", "baseline_ocpu_utilization", "instance_oci_time_created",
 		"instance_oracle_created_on_raw", "instance_oracle_created_on_utc",
 		"instance_age_days_as_of_report", "instance_oracle_created_by",
-		"instance_created_by_user",
+		"instance_created_by_user", "instance_created_by_source",
 		"instance_created_on_tag_status", "boot_volume_count", "attached_block_volume_count",
 		"boot_volume_inventory_complete", "block_volume_inventory_complete",
 		"boot_volume_total_size_gbs", "attached_block_volume_total_size_gbs",
@@ -263,7 +266,7 @@ func marshalComputeCSV(report model.Report) ([]byte, error) {
 		"volume_auto_tuned_vpus_per_gb", "volume_oci_time_created",
 		"volume_oracle_created_on_raw", "volume_oracle_created_on_utc",
 		"volume_age_days_as_of_report", "volume_oracle_created_by",
-		"volume_created_by_user",
+		"volume_created_by_user", "volume_created_by_source",
 		"volume_created_on_tag_status", "is_read_only", "is_shareable",
 		"pv_encryption_in_transit_enabled",
 	}
@@ -306,6 +309,7 @@ func computeCSVRow(
 ) []string {
 	row := []string{
 		report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		report.ApplicationVersion,
 		report.TenancyOCID,
 		instance.Region,
 		instance.AvailabilityDomain,
@@ -324,6 +328,7 @@ func computeCSVRow(
 		int64Pointer(instance.OracleTags.AgeDaysAsOfReport),
 		instance.OracleTags.CreatedBy,
 		instance.OracleTags.CreatedByUser,
+		instance.OracleTags.CreatedBySource,
 		instance.OracleTags.CreatedOnTagStatus,
 		strconv.Itoa(instance.BootVolumeCount),
 		strconv.Itoa(instance.AttachedBlockVolumeCount),
@@ -335,7 +340,7 @@ func computeCSVRow(
 		strconv.FormatBool(instance.AttachedStorageSizeComplete),
 	}
 	if volume == nil {
-		return append(row, make([]string, 22)...)
+		return append(row, make([]string, 23)...)
 	}
 	return append(row,
 		volume.Kind,
@@ -356,6 +361,7 @@ func computeCSVRow(
 		int64Pointer(volume.OracleTags.AgeDaysAsOfReport),
 		volume.OracleTags.CreatedBy,
 		volume.OracleTags.CreatedByUser,
+		volume.OracleTags.CreatedBySource,
 		volume.OracleTags.CreatedOnTagStatus,
 		boolPointer(volume.IsReadOnly),
 		boolPointer(volume.IsShareable),
@@ -371,19 +377,19 @@ func marshalAttachedVolumesCSV(report model.Report, volumeKind string) ([]byte, 
 	var output bytes.Buffer
 	writer := csv.NewWriter(&output)
 	header := []string{
-		"generated_at", "tenancy_ocid", "region", "instance_availability_domain",
+		"generated_at", "application_version", "tenancy_ocid", "region", "instance_availability_domain",
 		"instance_compartment_ocid", "instance_ocid", "instance_display_name",
 		"instance_lifecycle_state", "instance_shape", "instance_oci_time_created",
 		"instance_oracle_created_on_raw", "instance_oracle_created_on_utc",
 		"instance_age_days_as_of_report", "instance_oracle_created_by",
-		"instance_created_by_user", "instance_created_on_tag_status",
+		"instance_created_by_user", "instance_created_by_source", "instance_created_on_tag_status",
 		"volume_kind", "volume_ocid", "volume_compartment_ocid", "volume_display_name",
 		"volume_availability_domain", "volume_lifecycle_state", "volume_size_gbs",
 		"volume_size_mbs", "volume_vpus_per_gb", "volume_auto_tuned_vpus_per_gb",
 		"volume_auto_tune_enabled", "volume_oci_time_created",
 		"volume_oracle_created_on_raw", "volume_oracle_created_on_utc",
 		"volume_age_days_as_of_report", "volume_oracle_created_by",
-		"volume_created_by_user", "volume_created_on_tag_status", "attachment_ocid",
+		"volume_created_by_user", "volume_created_by_source", "volume_created_on_tag_status", "attachment_ocid",
 		"attachment_type", "attachment_lifecycle_state", "device", "is_read_only",
 		"is_shareable", "pv_encryption_in_transit_enabled",
 	}
@@ -421,6 +427,7 @@ func attachedVolumeCSVRow(
 ) []string {
 	return []string{
 		report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		report.ApplicationVersion,
 		report.TenancyOCID,
 		instance.Region,
 		instance.AvailabilityDomain,
@@ -435,6 +442,7 @@ func attachedVolumeCSVRow(
 		int64Pointer(instance.OracleTags.AgeDaysAsOfReport),
 		instance.OracleTags.CreatedBy,
 		instance.OracleTags.CreatedByUser,
+		instance.OracleTags.CreatedBySource,
 		instance.OracleTags.CreatedOnTagStatus,
 		volume.Kind,
 		volume.ID,
@@ -453,6 +461,7 @@ func attachedVolumeCSVRow(
 		int64Pointer(volume.OracleTags.AgeDaysAsOfReport),
 		volume.OracleTags.CreatedBy,
 		volume.OracleTags.CreatedByUser,
+		volume.OracleTags.CreatedBySource,
 		volume.OracleTags.CreatedOnTagStatus,
 		volume.AttachmentID,
 		volume.AttachmentType,
@@ -538,6 +547,8 @@ func marshalMarkdown(
 	var output strings.Builder
 	fmt.Fprintln(&output, "# OCI Autonomous Database and Compute inventory")
 	fmt.Fprintln(&output)
+	fmt.Fprintf(&output, "- Application version: `%s`\n", report.ApplicationVersion)
+	fmt.Fprintf(&output, "- Report schema version: `%s`\n", report.SchemaVersion)
 	fmt.Fprintf(&output, "- Generated (UTC): `%s`\n", report.GeneratedAt.UTC().Format("2006-01-02T15:04:05Z"))
 	fmt.Fprintf(&output, "- Tenancy: `%s`\n", report.TenancyOCID)
 	fmt.Fprintf(&output, "- Autonomous Database Search query: `%s`\n",

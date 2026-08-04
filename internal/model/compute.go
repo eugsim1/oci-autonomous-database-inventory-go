@@ -15,6 +15,7 @@ type OracleTagAudit struct {
 	CreatedOnUTC       string `json:"created_on_utc,omitempty"`
 	CreatedBy          string `json:"created_by,omitempty"`
 	CreatedByUser      string `json:"created_by_user,omitempty"`
+	CreatedBySource    string `json:"created_by_source,omitempty"`
 	AgeDaysAsOfReport  *int64 `json:"age_days_as_of_report,omitempty"`
 	CreatedOnTagStatus string `json:"created_on_tag_status"`
 }
@@ -89,12 +90,36 @@ type ComputeInstanceRecord struct {
 }
 
 func NewOracleTagAudit(definedTags map[string]map[string]interface{}, asOf time.Time) OracleTagAudit {
-	namespace := findTagNamespace(definedTags, oracleTagsNamespace)
+	return NewOracleTagAuditFromTags(definedTags, nil, asOf)
+}
+
+func NewOracleTagAuditFromTags(
+	definedTags map[string]map[string]interface{},
+	freeformTags map[string]string,
+	asOf time.Time,
+) OracleTagAudit {
+	namespaceName, namespace := findTagNamespace(definedTags, oracleTagsNamespace)
+	createdOn := findTagValue(namespace, "CreatedOn")
 	createdBy := findTagValue(namespace, "CreatedBy")
+	createdBySource := ""
+	if createdBy != "" {
+		createdBySource = "defined_tags:" + namespaceName + ".CreatedBy"
+	}
+	if createdOn == "" {
+		_, createdOn = findFreeformTagValue(freeformTags, "CreatedOn")
+	}
+	if createdBy == "" {
+		var key string
+		key, createdBy = findFreeformTagValue(freeformTags, "CreatedBy")
+		if createdBy != "" {
+			createdBySource = "freeform_tags:" + key
+		}
+	}
 	audit := OracleTagAudit{
-		CreatedOnRaw:       findTagValue(namespace, "CreatedOn"),
+		CreatedOnRaw:       createdOn,
 		CreatedBy:          createdBy,
 		CreatedByUser:      createdBy,
+		CreatedBySource:    createdBySource,
 		CreatedOnTagStatus: "missing",
 	}
 	if audit.CreatedOnRaw == "" {
@@ -131,7 +156,7 @@ func NewComputeInstanceRecord(
 		FaultDomain:                  stringValue(instance.FaultDomain),
 		LifecycleState:               string(instance.LifecycleState),
 		Shape:                        stringValue(instance.Shape),
-		OracleTags:                   NewOracleTagAudit(instance.DefinedTags, asOf),
+		OracleTags:                   NewOracleTagAuditFromTags(instance.DefinedTags, instance.FreeformTags, asOf),
 		BootVolumeCount:              len(bootVolumes),
 		AttachedBlockVolumeCount:     len(blockVolumes),
 		BootVolumeInventoryComplete:  bootVolumeInventoryComplete,
@@ -186,7 +211,7 @@ func NewBootVolumeRecord(
 		VPUsPerGB:                      volume.VpusPerGB,
 		AutoTunedVPUsPerGB:             volume.AutoTunedVpusPerGB,
 		IsAutoTuneEnabled:              volume.IsAutoTuneEnabled,
-		OracleTags:                     NewOracleTagAudit(volume.DefinedTags, asOf),
+		OracleTags:                     NewOracleTagAuditFromTags(volume.DefinedTags, volume.FreeformTags, asOf),
 		AttachmentID:                   stringValue(attachment.Id),
 		AttachmentType:                 "boot",
 		AttachmentLifecycleState:       string(attachment.LifecycleState),
@@ -237,7 +262,7 @@ func NewBlockVolumeRecord(
 		VPUsPerGB:                      volume.VpusPerGB,
 		AutoTunedVPUsPerGB:             volume.AutoTunedVpusPerGB,
 		IsAutoTuneEnabled:              volume.IsAutoTuneEnabled,
-		OracleTags:                     NewOracleTagAudit(volume.DefinedTags, asOf),
+		OracleTags:                     NewOracleTagAuditFromTags(volume.DefinedTags, volume.FreeformTags, asOf),
 		AttachmentID:                   stringValue(attachment.GetId()),
 		AttachmentType:                 volumeAttachmentType(attachment),
 		AttachmentLifecycleState:       string(attachment.GetLifecycleState()),
@@ -281,21 +306,21 @@ func NewUnavailableBlockVolumeRecord(attachment core.VolumeAttachment) BlockVolu
 func findTagNamespace(
 	definedTags map[string]map[string]interface{},
 	name string,
-) map[string]interface{} {
+) (string, map[string]interface{}) {
 	// Prefer the canonical namespace when both forms exist, then accept common
 	// separator variants such as Oracle_Tags returned by some tag definitions.
 	for namespace, values := range definedTags {
 		if strings.EqualFold(namespace, name) {
-			return values
+			return namespace, values
 		}
 	}
 	target := normalizeTagNamespace(name)
 	for namespace, values := range definedTags {
 		if normalizeTagNamespace(namespace) == target {
-			return values
+			return namespace, values
 		}
 	}
-	return nil
+	return "", nil
 }
 
 func normalizeTagNamespace(value string) string {
@@ -316,6 +341,29 @@ func findTagValue(values map[string]interface{}, name string) string {
 		}
 	}
 	return ""
+}
+
+func findFreeformTagValue(values map[string]string, name string) (string, string) {
+	target := normalizeQualifiedTagName(oracleTagsNamespace + "." + name)
+	for key, value := range values {
+		if normalizeQualifiedTagName(key) == target && value != "" {
+			return key, value
+		}
+	}
+	return "", ""
+}
+
+func normalizeQualifiedTagName(value string) string {
+	replacer := strings.NewReplacer(
+		"-", "",
+		"_", "",
+		" ", "",
+		"\t", "",
+		".", "",
+		"/", "",
+		":", "",
+	)
+	return strings.ToLower(replacer.Replace(strings.TrimSpace(value)))
 }
 
 func volumeAttachmentType(attachment core.VolumeAttachment) string {

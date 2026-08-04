@@ -13,7 +13,7 @@ import (
 	"github.com/eugsim1/oci-autonomous-database-inventory-go/internal/report"
 )
 
-var version = "2.4.1"
+var version = "2.5.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -32,6 +32,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, version)
 		return 0
 	}
+	fmt.Fprintf(stdout, "oci-adb-inventory version: %s\n", version)
 
 	collector, err := oci.NewCollector(cfg, stderr)
 	if err != nil {
@@ -46,6 +47,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
+	inventory.ApplicationVersion = version
 
 	paths, err := report.Write(inventory, cfg.OutputDir)
 	if err != nil {
@@ -60,6 +62,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "JSON: %s\n", paths.JSON)
 	fmt.Fprintf(stdout, "Autonomous Database CSV: %s\n", paths.AutonomousDatabaseCSV)
 	fmt.Fprintf(stdout, "Compute instance CSV: %s\n", paths.ComputeInstanceCSV)
+	fmt.Fprintf(stdout, "Attached boot volumes CSV: %s\n", paths.AttachedBootVolumesCSV)
+	fmt.Fprintf(stdout, "Attached block volumes CSV: %s\n", paths.AttachedBlockVolumesCSV)
 	fmt.Fprintf(stdout, "Failed requests CSV: %s\n", paths.FailedRequestsCSV)
 	fmt.Fprintf(stdout, "Markdown: %s\n", paths.Markdown)
 
