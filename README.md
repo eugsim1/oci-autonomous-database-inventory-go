@@ -97,8 +97,8 @@ region. Results are de-duplicated by `(region, OCID)`. The service-specific
 ## Prerequisites
 
 - Go 1.25 or newer;
-- OCI API signing-key configuration, an OCI Compute instance principal, or an
-  OCI resource-principal runtime;
+- OCI API signing-key configuration, an OCI Compute instance principal, an OCI
+  resource-principal runtime, or an enhanced OKE cluster with workload identity;
 - the IAM permissions below;
 - network access to Identity, Resource Search, Database, Compute, and Block
   Volume endpoints in all selected regions.
@@ -189,6 +189,34 @@ report.
 
 The hosting service's resource-principal policy condition must be scoped to
 that service. Do not use an unconditioned `any-user` policy.
+
+## Run with OKE workload identity
+
+Use this only from a pod in an **enhanced** OKE cluster. The pod must use the
+namespace and service account named in its OCI workload-identity policy. OKE
+mounts the service-account token and Kubernetes CA certificate; the manifest
+sets the two OCI SDK environment variables:
+
+```yaml
+spec:
+  serviceAccountName: oci-adb-inventory
+  containers:
+    - name: inventory
+      env:
+        - name: OCI_RESOURCE_PRINCIPAL_VERSION
+          value: "2.2"
+        - name: OCI_RESOURCE_PRINCIPAL_REGION
+          value: eu-frankfurt-1
+      args:
+        - --auth
+        - oke_workload_identity
+        - --output-dir
+        - /reports
+```
+
+Do not mount API keys in this mode. The companion OKE/Terraform project creates
+the enhanced cluster, scoped policy, service account, `CronJob`, and persistent
+report volume.
 
 ## Region selection
 
@@ -415,7 +443,8 @@ The timeout and bounded worker pool apply to the entire collection:
 ## Options
 
 ```text
---auth string               api_key, instance_principal, resource_principal
+--auth string               api_key, instance_principal, resource_principal,
+                            or oke_workload_identity
 --bootstrap-region string   region for the initial Identity request
 --config-file string        OCI SDK config path
 --output-dir string         report directory (default "reports")
@@ -428,139 +457,230 @@ The timeout and bounded worker pool apply to the entire collection:
 --workers int               concurrent OCI operations
 ```
 
-## Container
+## Podman on Linux: build, deploy, and run
 
-### Why the Dockerfile exists
+Podman is the primary container workflow for this project. It builds standard
+OCI images, runs rootless without a daemon, and accepts the same image format
+that OKE and Docker use. Docker is not required.
 
-Docker is optional; the native Go binary remains the simplest deployment when
-Go or a prebuilt binary is available. The Dockerfile provides a reproducible
-Linux build and a small runtime for servers where installing Go is undesirable.
-It uses two stages:
+### Why `Containerfile` and `Dockerfile` are included
 
-1. `golang:1.25` downloads the pinned modules and builds a static,
-   CGO-disabled Linux executable.
+The native Go binary remains the simplest choice when installing it directly is
+acceptable. A container makes the Linux build reproducible and avoids installing
+Go on the execution server. `Containerfile` is the canonical Podman build file;
+the identical `Dockerfile` is retained for Docker-compatible build systems.
+
+Both use two stages:
+
+1. `golang:1.25` downloads pinned modules and builds a static, CGO-disabled
+   executable.
 2. `gcr.io/distroless/static-debian12:nonroot` runs only that executable as a
-   non-root user. The final image contains no Go toolchain, shell, or package
-   manager.
+   non-root user. It contains no shell, package manager, Go compiler, or OCI
+   credentials.
 
-The program is a one-shot CLI: it listens on no port, needs no `EXPOSE`, and
-exits after writing the reports. The image does not include OCI credentials.
-`.dockerignore` excludes reports, local caches, OCI configuration directories,
-private-key formats, and environment files from the build context.
+This is a one-shot batch program. It opens no listening port, needs no `EXPOSE`,
+and exits after writing five reports. `.dockerignore` prevents local reports,
+caches, OCI configuration, key formats, and environment files from entering the
+build context.
 
-### Build the Linux image
+### Step 1: install Podman
+
+Oracle Linux 8/9, RHEL, Rocky Linux, or AlmaLinux:
 
 ```bash
-docker build --pull -t oci-adb-inventory:2.1.0 .
-docker image inspect oci-adb-inventory:2.1.0
+sudo dnf install -y podman git
+podman --version
+podman info
 ```
 
-The build requires access to the Go module proxy (or your configured private
-proxy) and to the two base-image registries. Rebuild the image to pick up base
-image security updates.
+Ubuntu or Debian:
 
-### Linux host with API-key authentication
+```bash
+sudo apt-get update
+sudo apt-get install -y podman git
+podman --version
+podman info
+```
 
-Create the output directory first. Mount the OCI directory at the same absolute
-path used on the Linux host so an absolute `key_file` in `~/.oci/config`
-continues to resolve inside the container:
+Run the remaining commands as a normal Linux user. Rootless Podman is preferred;
+do not add `sudo` unless your platform standard explicitly requires rootful
+containers.
+
+### Step 2: obtain and build the project
+
+```bash
+git clone https://github.com/eugsim1/oci-autonomous-database-inventory-go.git
+cd oci-autonomous-database-inventory-go
+podman build --pull=always \
+  --file Containerfile \
+  --tag localhost/oci-adb-inventory:2.2.0 \
+  .
+podman image inspect localhost/oci-adb-inventory:2.2.0
+podman run --rm localhost/oci-adb-inventory:2.2.0 --version
+```
+
+The build host needs HTTPS access to the Go module proxy and both base-image
+registries. Rebuild periodically to incorporate patched base images. For
+reproducible promotion, deploy by immutable image digest rather than a mutable
+tag.
+
+### Step 3A: configure API-key authentication
+
+Create the OCI SDK config outside this repository. Keep the key in the same
+directory so the complete directory can be mounted at the same absolute Linux
+path:
+
+```bash
+mkdir -p "$HOME/.oci"
+chmod 700 "$HOME/.oci"
+chmod 600 "$HOME/.oci/config" "$HOME/.oci/oci_api_key.pem"
+```
+
+Example `$HOME/.oci/config`:
+
+```ini
+[DEFAULT]
+user=ocid1.user.oc1..example
+fingerprint=aa:bb:cc:dd:example
+tenancy=ocid1.tenancy.oc1..example
+region=eu-frankfurt-1
+key_file=/home/your-user/.oci/oci_api_key.pem
+```
+
+`key_file` must be an absolute path that exists inside the container. The next
+command mounts `$HOME/.oci` at that same absolute path, so replace
+`/home/your-user` with the real output of `printf '%s\n' "$HOME"`. Never copy
+the key into this project or an image layer.
+
+### Step 4A: run with an API key
+
+The supplied wrapper adds a read-only root filesystem, drops Linux capabilities,
+prevents privilege escalation, preserves the calling UID/GID, uses private
+SELinux relabeling (`:Z`), and writes only to the mounted reports directory:
+
+```bash
+chmod +x scripts/*.sh
+./scripts/run-podman-api-key.sh --strict --timeout 45m
+```
+
+Optional variables and arguments:
+
+```bash
+OCI_PROFILE=REPORTING \
+OUTPUT_DIR=/srv/oci-inventory/reports \
+APP_IMAGE=localhost/oci-adb-inventory:2.2.0 \
+./scripts/run-podman-api-key.sh \
+  --regions eu-frankfurt-1,eu-amsterdam-1 \
+  --workers 8
+```
+
+The equivalent explicit command is:
 
 ```bash
 mkdir -p "$PWD/reports"
-docker run --rm \
+podman run --rm \
+  --userns=keep-id \
   --user "$(id -u):$(id -g)" \
+  --read-only \
+  --security-opt=no-new-privileges \
+  --cap-drop=ALL \
   --env "HOME=$HOME" \
-  --mount "type=bind,src=$HOME/.oci,dst=$HOME/.oci,readonly" \
-  --mount "type=bind,src=$PWD/reports,dst=/reports" \
-  oci-adb-inventory:2.1.0 \
+  --volume "$HOME/.oci:$HOME/.oci:ro,Z" \
+  --volume "$PWD/reports:/reports:Z" \
+  localhost/oci-adb-inventory:2.2.0 \
   --auth api_key \
   --config-file "$HOME/.oci/config" \
   --profile DEFAULT \
   --output-dir /reports
 ```
 
-If the config uses a relative or `~` key path, change it to the mounted
-container path or supply a separate protected container-specific config. The
-key and config must be readable by the numeric UID used for the container, and
-the reports directory must be writable by it. Never `COPY` the key into the
-project or image.
+Use `:z` instead of `:Z` only when multiple containers intentionally share the
+same bind mount. On systems without SELinux, Podman accepts the option without
+requiring a policy change.
 
-### Windows Docker Desktop with API keys
+### Step 3B/4B: use an OCI Compute instance principal
 
-A Windows `key_file=C:\...` path is not valid inside a Linux container. Create
-`%USERPROFILE%\.oci\config.docker` outside this repository with the same
-tenancy, user, fingerprint, and region values as the normal profile, but use a
-Linux container key path, for example:
-
-```text
-[DEFAULT]
-user=ocid1.user.oc1..example
-fingerprint=aa:bb:cc:dd:example
-tenancy=ocid1.tenancy.oc1..example
-region=eu-frankfurt-1
-key_file=/oci/oci_api_key.pem
-```
-
-Assuming the private key is
-`%USERPROFILE%\.oci\oci_api_key.pem`, run from PowerShell:
-
-```powershell
-New-Item -ItemType Directory -Force -Path .\reports | Out-Null
-$reportDir = (Resolve-Path .\reports).Path
-$ociDir = (Resolve-Path "$env:USERPROFILE\.oci").Path
-
-docker run --rm `
-  --mount "type=bind,source=$ociDir,target=/oci,readonly" `
-  --mount "type=bind,source=$reportDir,target=/reports" `
-  oci-adb-inventory:2.1.0 `
-  --auth api_key `
-  --config-file /oci/config.docker `
-  --profile DEFAULT `
-  --output-dir /reports
-```
-
-Docker Desktop must be allowed to share the two host directories. Keep
-`config.docker` and the private key outside Git and restrict their Windows ACLs.
-
-### OCI Compute instance principal
-
-Run this only on an OCI Compute instance that belongs to the intended dynamic
-group and has the policies shown above. No API-key mount is needed:
+On an OCI Compute instance, place that instance in the intended dynamic group
+and grant the four read policies in [policies/README.md](policies/README.md).
+No API key is mounted:
 
 ```bash
-mkdir -p "$PWD/reports"
-docker run --rm \
-  --network host \
-  --user "$(id -u):$(id -g)" \
-  --mount "type=bind,src=$PWD/reports,dst=/reports" \
-  oci-adb-inventory:2.1.0 \
-  --auth instance_principal \
-  --output-dir /reports
+chmod +x scripts/*.sh
+./scripts/run-podman-instance-principal.sh --strict --timeout 45m
 ```
 
-Host networking is shown so the SDK can reliably reach the OCI instance
-metadata endpoint. Apply the host's container-network policy and firewall
-standards; do not use instance-principal mode away from the intended OCI
-instance.
+The wrapper uses `--network host` so the SDK can reach the OCI instance metadata
+service. Run it only on the intended OCI instance, and retain the host firewall
+and container-network controls required by your organization.
 
-### Resource principal
-
-Resource-principal environment variables, session token, and private-key path
-are supplied by the hosting OCI service and differ by runtime. Pass only the
-service-provided variables and bind-mounted token/key paths at `docker run`
-time. Do not bake them into an image or a Dockerfile layer. If the hosting
-service does not support custom containers or forwarding its resource-principal
-material, use the native binary or instance principal instead.
-
-### Read reports and clean up
-
-The five timestamped report files are under the mounted `reports` directory.
-The container is removed by `--rm`; the reports remain on the host. To remove
-only the locally built image after the reports have been secured:
+### Step 5: verify and retain the reports
 
 ```bash
-docker image rm oci-adb-inventory:2.1.0
+find reports -maxdepth 1 -type f -printf '%TY-%Tm-%TdT%TH:%TM:%TS %f\n' | sort
+latest_markdown="$(find reports -maxdepth 1 -name '*.md' -type f -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)"
+sed -n '1,80p' "$latest_markdown"
 ```
+
+The container is automatically removed by `--rm`; timestamped reports remain on
+the host. Treat JSON, CSV, Markdown, and logs as sensitive tenancy metadata.
+
+### Step 6: optionally push the image to OCIR
+
+First create an OCI auth token for the registry user. Do not use the OCI console
+password. The current recommended registry domain format is
+`ocir.<region>.oci.oraclecloud.com`:
+
+```bash
+export OCI_REGION=eu-frankfurt-1
+export OCI_NAMESPACE='<tenancy-namespace>'
+export OCIR_REPOSITORY='oci-adb-inventory'
+export IMAGE_TAG='2.2.0'
+export IMAGE="ocir.${OCI_REGION}.oci.oraclecloud.com/${OCI_NAMESPACE}/${OCIR_REPOSITORY}:${IMAGE_TAG}"
+read -rsp 'OCIR auth token: ' OCIR_AUTH_TOKEN; echo
+printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
+  --username "${OCI_NAMESPACE}/<identity-domain>/<username>" \
+  --password-stdin \
+  "ocir.${OCI_REGION}.oci.oraclecloud.com"
+unset OCIR_AUTH_TOKEN
+podman tag localhost/oci-adb-inventory:2.2.0 "$IMAGE"
+podman push "$IMAGE"
+podman logout "ocir.${OCI_REGION}.oci.oraclecloud.com"
+```
+
+For a legacy tenancy without identity domains, the username can be
+`<tenancy-namespace>/<username>`. Create the private OCIR repository first or
+allow the push identity to create it. The companion OKE Terraform project
+creates the repository but intentionally never stores the auth token in
+Terraform state.
+
+### Step 7: schedule the one-shot run
+
+Because the program exits, schedule the wrapper rather than keeping a container
+running. For example, edit the current user's crontab with `crontab -e` and run
+at 02:15 UTC daily:
+
+```cron
+15 2 * * * cd /opt/oci-autonomous-database-inventory-go && OUTPUT_DIR=/srv/oci-inventory/reports ./scripts/run-podman-instance-principal.sh --strict --timeout 45m >>/srv/oci-inventory/podman-run.log 2>&1
+```
+
+Use an absolute checkout path, pre-create the output/log directory with owner-only
+permissions, and confirm the scheduler's time zone. For API keys, the scheduled
+user must own and be able to read the protected `$HOME/.oci` files.
+
+### Resource principals and Docker compatibility
+
+For a non-OKE OCI resource-principal runtime, pass only the service-injected
+environment variables and bind-mounted token/key paths. Never bake them into an
+image. OKE uses the dedicated `oke_workload_identity` mode described earlier.
+
+The same image can be built with Docker when a downstream system requires it:
+
+```bash
+docker build --pull --file Dockerfile --tag oci-adb-inventory:2.2.0 .
+```
+
+Podman and Docker are alternative local runtimes; Kubernetes/OKE later pulls the
+same OCI image and schedules it as a `Job` or `CronJob`.
 
 ## Security notes
 
@@ -583,6 +703,9 @@ internal/oci/            auth, Search, Database, Compute, Block Volume clients
 internal/report/         JSON, three CSV files, Markdown, atomic writes
 docs/                    SDD and editable diagrams
 policies/                IAM and resource-principal guidance
+scripts/                 hardened Podman run wrappers for Linux
+Containerfile            canonical Podman/OCI image build
+Dockerfile               Docker-compatible copy of the image build
 ```
 
 ## Oracle documentation
@@ -597,6 +720,8 @@ policies/                IAM and resource-principal guidance
 - [Getting boot-volume details](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/get-bv-boot-volume.htm)
 - [Getting block-volume details](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/get-bv-volume.htm)
 - [OCI Go SDK authentication](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/gosdkgettingstarted.htm)
+- [OKE workload identity](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contenggrantingworkloadaccesstoresources.htm)
+- [OCIR concepts and image names](https://docs.oracle.com/en-us/iaas/Content/Registry/Concepts/registryconcepts.htm)
 
 ## License
 

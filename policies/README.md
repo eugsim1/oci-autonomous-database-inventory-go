@@ -45,6 +45,26 @@ Resource-principal policy syntax depends on the hosting OCI service. Scope an
 `any-user` statement with `request.principal.type` and any available
 service-specific conditions. Do not use an unconditioned `any-user` grant.
 
+## OKE workload identity
+
+OKE workload identity is supported only by enhanced clusters. It identifies a
+specific cluster, Kubernetes namespace, and service account without an API key
+or dynamic group. Repeat the following condition for each required statement:
+
+```text
+Allow any-user to inspect tenancies in tenancy where all {
+  request.principal.type = 'workload',
+  request.principal.namespace = '<namespace>',
+  request.principal.service_account = '<service-account>',
+  request.principal.cluster_id = '<cluster-ocid>'
+}
+```
+
+Use the same condition with `inspect autonomous-databases`, `read
+instance-family`, and `inspect volume-family`. The separate OKE deployment
+project generates these four policy statements. OKE workload identities cannot
+be placed in a dynamic group.
+
 ## Compartment scope
 
 The examples use `in tenancy` because the requested inventory spans every
@@ -57,3 +77,4 @@ inventory and Search will omit resources outside that scope.
 - [Database Service IAM reference](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/databasepolicyreference.htm)
 - [Search permissions](https://docs.oracle.com/en-us/iaas/Content/Search/Concepts/querypermissions.htm)
 - [Automatic Oracle-Tags defaults](https://docs.oracle.com/en-us/iaas/Content/Tagging/Concepts/understandingautomaticdefaulttags.htm)
+- [OKE workload identity](https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contenggrantingworkloadaccesstoresources.htm)

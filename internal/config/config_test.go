@@ -25,3 +25,13 @@ func TestParseRejectsUnknownAuth(t *testing.T) {
 		t.Fatal("Parse() expected an error")
 	}
 }
+
+func TestParseAcceptsOKEWorkloadIdentity(t *testing.T) {
+	cfg, err := Parse([]string{"--auth", "oke_workload_identity"}, io.Discard)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if cfg.AuthMode != AuthOKEWorkloadIdentity {
+		t.Fatalf("AuthMode = %q, want %q", cfg.AuthMode, AuthOKEWorkloadIdentity)
+	}
+}

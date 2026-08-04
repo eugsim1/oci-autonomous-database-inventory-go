@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	AuthAPIKey            = "api_key"
-	AuthInstancePrincipal = "instance_principal"
-	AuthResourcePrincipal = "resource_principal"
+	AuthAPIKey              = "api_key"
+	AuthInstancePrincipal   = "instance_principal"
+	AuthResourcePrincipal   = "resource_principal"
+	AuthOKEWorkloadIdentity = "oke_workload_identity"
 )
 
 type Config struct {
@@ -44,7 +45,7 @@ func Parse(args []string, output io.Writer) (Config, error) {
 	var regions string
 	fs := flag.NewFlagSet("oci-adb-inventory", flag.ContinueOnError)
 	fs.SetOutput(output)
-	fs.StringVar(&cfg.AuthMode, "auth", AuthAPIKey, "authentication: api_key, instance_principal, or resource_principal")
+	fs.StringVar(&cfg.AuthMode, "auth", AuthAPIKey, "authentication: api_key, instance_principal, resource_principal, or oke_workload_identity")
 	fs.StringVar(&cfg.ConfigFile, "config-file", "", "OCI SDK config path; empty uses ~/.oci/config or OCI_CONFIG_FILE")
 	fs.StringVar(&cfg.Profile, "profile", "DEFAULT", "OCI SDK config profile for api_key authentication")
 	fs.StringVar(&cfg.TenancyOCID, "tenancy-id", "", "tenancy OCID; empty resolves it from the authentication provider")
@@ -90,7 +91,7 @@ func Parse(args []string, output io.Writer) (Config, error) {
 
 func (c Config) Validate() error {
 	switch c.AuthMode {
-	case AuthAPIKey, AuthInstancePrincipal, AuthResourcePrincipal:
+	case AuthAPIKey, AuthInstancePrincipal, AuthResourcePrincipal, AuthOKEWorkloadIdentity:
 	default:
 		return fmt.Errorf("unsupported --auth %q", c.AuthMode)
 	}

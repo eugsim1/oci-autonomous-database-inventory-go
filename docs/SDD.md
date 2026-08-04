@@ -39,7 +39,9 @@ contract.
 
 - API signing key;
 - Compute instance principal;
-- resource principal.
+- resource principal;
+- enhanced OKE workload identity, using the projected Kubernetes service-account
+  token and OCI SDK workload-identity exchange.
 
 The tenancy OCID comes from `--tenancy-id` or the provider.
 

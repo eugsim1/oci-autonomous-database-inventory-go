@@ -25,6 +25,11 @@ func configurationProvider(cfg config.Config) (common.ConfigurationProvider, str
 		if err != nil {
 			return nil, "", fmt.Errorf("create resource principal provider: %w", err)
 		}
+	case config.AuthOKEWorkloadIdentity:
+		provider, err = auth.OkeWorkloadIdentityConfigurationProvider()
+		if err != nil {
+			return nil, "", fmt.Errorf("create OKE workload identity provider: %w", err)
+		}
 	default:
 		return nil, "", fmt.Errorf("unsupported authentication mode %q", cfg.AuthMode)
 	}
