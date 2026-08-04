@@ -97,6 +97,7 @@ region. Results are de-duplicated by `(region, OCID)`. The service-specific
 ## Prerequisites
 
 - Go 1.25 or newer;
+- GNU Make;
 - OCI API signing-key configuration, an OCI Compute instance principal, an OCI
   resource-principal runtime, or an enhanced OKE cluster with workload identity;
 - the IAM permissions below;
@@ -133,16 +134,127 @@ existing permissions and needs no separate Search policy. See
 
 ## Build and test
 
+### Recommended Linux build script
+
+Install GNU Make if it is not already present:
+
 ```bash
+# Oracle Linux, RHEL, Rocky Linux, or AlmaLinux
+sudo dnf install -y git make
+
+# Ubuntu or Debian
+sudo apt-get update
+sudo apt-get install -y git make
+```
+
+Install Go 1.25 or newer using the official
+[Go installation instructions](https://go.dev/doc/install), then verify both
+tools:
+
+```bash
+go version
+make --version
+```
+
+The root [build.sh](build.sh) is the safest complete rebuild path. From the
+repository root, run it as a normal Linux user:
+
+```bash
+chmod +x build.sh
+./build.sh
+```
+
+The script resolves its own project directory, so it can also be invoked by
+absolute path while your shell is in another directory.
+
+It performs these operations in order:
+
+1. resolves the project and exact target path;
+2. verifies that `go` and GNU Make are available;
+3. runs `make clean`, which removes only `bin/oci-adb-inventory`;
+4. confirms that no previous binary remains;
+5. downloads the modules pinned by `go.mod` and `go.sum`;
+6. runs all tests and `go vet`;
+7. builds a new CGO-disabled, trimmed Linux executable;
+8. verifies the new file is executable and prints its application version and
+   SHA-256 checksum.
+
+If dependency download, tests, vet, or compilation fails, the script exits
+non-zero and does not leave the old executable where it could be mistaken for a
+successful new build. To skip tests and vet for a controlled build only:
+
+```bash
+RUN_TESTS=0 ./build.sh
+```
+
+The default is `RUN_TESTS=1`; normal release builds should retain it.
+
+### How to use the Makefile
+
+The Makefile is a set of named build commands called **targets**. Run them from
+the repository root. `make` without a target selects `all`, which builds the
+binary but does not download modules or run tests explicitly:
+
+```bash
+make help
+make
+```
+
+Available targets:
+
+| Command | Action |
+|---|---|
+| `make deps` | Download modules from `go.mod`/`go.sum` |
+| `make test` | Run `go test ./...` |
+| `make vet` | Run `go vet ./...` |
+| `make check` | Run both tests and vet |
+| `make fmt` | Format Go source under `cmd/` and `internal/` |
+| `make build` | Build `bin/oci-adb-inventory`; an existing file is replaced only when the build writes the new output |
+| `make clean` | Remove only `bin/oci-adb-inventory`; it does not delete reports, source, or Go caches |
+| `make rebuild` | Run `clean` followed by `build`; it does not run tests |
+
+A complete manual release sequence equivalent to the main parts of `build.sh`
+is:
+
+```bash
+make clean
+make deps
+make check
+make build
+./bin/oci-adb-inventory --version
+sha256sum ./bin/oci-adb-inventory
+```
+
+The Makefile defaults to `CGO_ENABLED=0` and linker flags `-s -w`. Override them
+only when there is a reviewed requirement:
+
+```bash
+make rebuild CGO_ENABLED=1
+make rebuild LDFLAGS=
+```
+
+The earlier Makefile used `go clean`, which cleans Go build artifacts but does
+not guarantee removal of the explicit `go build -o bin/oci-adb-inventory`
+output. The updated `clean` target names that one file directly.
+
+### Direct Go commands and Windows
+
+Without GNU Make, the equivalent Linux commands are:
+
+```bash
+mkdir -p bin
+rm -f -- bin/oci-adb-inventory
 go mod download
 go test ./...
 go vet ./...
-go build -trimpath -o bin/oci-adb-inventory ./cmd/oci-adb-inventory
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" \
+  -o bin/oci-adb-inventory ./cmd/oci-adb-inventory
 ```
 
-On Windows:
+On Windows PowerShell:
 
 ```powershell
+New-Item -ItemType Directory -Force -Path .\bin | Out-Null
 go build -trimpath -o bin/oci-adb-inventory.exe ./cmd/oci-adb-inventory
 ```
 
@@ -697,6 +809,8 @@ same OCI image and schedules it as a `Job` or `CronJob`.
 
 ```text
 cmd/oci-adb-inventory/   CLI entry point
+build.sh                 validated clean/test/vet/static-build workflow for Linux
+Makefile                 composable dependency, QA, build, rebuild, and clean targets
 internal/config/         flags and validation
 internal/model/          canonical report model, tag audit, normalization
 internal/oci/            auth, Search, Database, Compute, Block Volume clients
