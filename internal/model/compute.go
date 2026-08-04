@@ -282,12 +282,28 @@ func findTagNamespace(
 	definedTags map[string]map[string]interface{},
 	name string,
 ) map[string]interface{} {
+	// Prefer the canonical namespace when both forms exist, then accept common
+	// separator variants such as Oracle_Tags returned by some tag definitions.
 	for namespace, values := range definedTags {
 		if strings.EqualFold(namespace, name) {
 			return values
 		}
 	}
+	target := normalizeTagNamespace(name)
+	for namespace, values := range definedTags {
+		if normalizeTagNamespace(namespace) == target {
+			return values
+		}
+	}
 	return nil
+}
+
+func normalizeTagNamespace(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.ReplaceAll(value, "-", "")
+	value = strings.ReplaceAll(value, "_", "")
+	value = strings.ReplaceAll(value, " ", "")
+	return value
 }
 
 func findTagValue(values map[string]interface{}, name string) string {

@@ -74,6 +74,33 @@ func TestOracleTagAuditUsesCreatedOnAndCreatedBy(t *testing.T) {
 	}
 }
 
+func TestOracleTagAuditAcceptsUnderscoreNamespace(t *testing.T) {
+	got := NewOracleTagAudit(map[string]map[string]interface{}{
+		"Oracle_Tags": {
+			"CreatedBy": "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com",
+		},
+	}, time.Now())
+
+	want := "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com"
+	if got.CreatedBy != want {
+		t.Fatalf("CreatedBy = %q, want %q", got.CreatedBy, want)
+	}
+	if got.CreatedByUser != want {
+		t.Fatalf("CreatedByUser = %q, want %q", got.CreatedByUser, want)
+	}
+}
+
+func TestOracleTagAuditPrefersCanonicalNamespace(t *testing.T) {
+	got := NewOracleTagAudit(map[string]map[string]interface{}{
+		"Oracle_Tags": {"CreatedBy": "underscore@example.com"},
+		"Oracle-Tags": {"CreatedBy": "canonical@example.com"},
+	}, time.Now())
+
+	if got.CreatedByUser != "canonical@example.com" {
+		t.Fatalf("CreatedByUser = %q, want canonical namespace value", got.CreatedByUser)
+	}
+}
+
 func TestOracleTagAuditReportsInvalidCreatedOn(t *testing.T) {
 	got := NewOracleTagAudit(map[string]map[string]interface{}{
 		"oracle-tags": {

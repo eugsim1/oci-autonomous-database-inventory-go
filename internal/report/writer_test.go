@@ -30,9 +30,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 			2026, 7, 1, 10, 11, 12, 0, time.UTC,
 		)},
 		DefinedTags: map[string]map[string]interface{}{
-			"Oracle-Tags": {
+			"Oracle_Tags": {
 				"CreatedOn": "2026-07-09T10:11:12Z",
-				"CreatedBy": "database-admin@example.com",
+				"CreatedBy": "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com",
 			},
 		},
 	}
@@ -151,7 +151,11 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	record := databases[0].(map[string]interface{})
 	summary := record["summary"].(map[string]interface{})
 	oracleTags := summary["oracle_tags"].(map[string]interface{})
-	if oracleTags["created_by_user"] != "database-admin@example.com" {
+	wantDatabaseCreatedBy := "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com"
+	if oracleTags["created_by"] != wantDatabaseCreatedBy {
+		t.Fatalf("JSON created_by = %v", oracleTags["created_by"])
+	}
+	if oracleTags["created_by_user"] != wantDatabaseCreatedBy {
 		t.Fatalf("JSON created_by_user = %v", oracleTags["created_by_user"])
 	}
 	configuration := record["configuration"].(map[string]interface{})
@@ -181,11 +185,15 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		t.Fatalf("Autonomous Database CSV row has %d columns, header has %d",
 			len(rows[1]), len(rows[0]))
 	}
-	if !strings.Contains(strings.Join(rows[1], ","), "database-admin@example.com") {
+	if !strings.Contains(strings.Join(rows[1], ","), "oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com") {
 		t.Fatalf("Autonomous Database CSV does not contain Oracle-Tags.CreatedBy: %#v", rows[1])
 	}
+	oracleCreatedByIndex := columnIndex(rows[0], "oracle_created_by")
+	if oracleCreatedByIndex == -1 || rows[1][oracleCreatedByIndex] != wantDatabaseCreatedBy {
+		t.Fatalf("Autonomous Database CSV oracle_created_by is missing or incorrect: %#v", rows[1])
+	}
 	createdByUserIndex := columnIndex(rows[0], "created_by_user")
-	if createdByUserIndex == -1 || rows[1][createdByUserIndex] != "database-admin@example.com" {
+	if createdByUserIndex == -1 || rows[1][createdByUserIndex] != wantDatabaseCreatedBy {
 		t.Fatalf("Autonomous Database CSV created_by_user is missing or incorrect: %#v", rows[1])
 	}
 	nbCreatedSinceIndex := columnIndex(rows[0], "nb_created_since")

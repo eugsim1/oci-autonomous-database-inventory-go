@@ -4,7 +4,7 @@ set -Eeuo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd -- "${script_dir}/.." && pwd)"
 
-image="${APP_IMAGE:-localhost/oci-adb-inventory:2.4.0}"
+image="${APP_IMAGE:-localhost/oci-adb-inventory:2.4.1}"
 output_dir="${OUTPUT_DIR:-${project_dir}/reports}"
 
 command -v podman >/dev/null 2>&1 || {

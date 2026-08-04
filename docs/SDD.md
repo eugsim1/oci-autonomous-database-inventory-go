@@ -95,7 +95,10 @@ The attachment object and corresponding volume object are both retained.
 ### Oracle tag audit
 
 The normalizer performs a case-insensitive lookup of the `Oracle-Tags`
-namespace and its `CreatedOn` and `CreatedBy` keys.
+namespace and its `CreatedOn` and `CreatedBy` keys. It treats hyphen,
+underscore, and space namespace separators as equivalent, so `Oracle_Tags` is
+accepted. An exact case-insensitive `Oracle-Tags` match takes precedence when
+multiple equivalent namespaces are present.
 
 `CreatedBy` is preserved as `created_by` and copied to the explicit
 `created_by_user` reporting alias. The CSV reports retain the legacy

@@ -399,7 +399,10 @@ not the abbreviated example above.
 
 Creation attribution for Autonomous Databases, Compute instances, boot
 volumes, and block volumes is taken only from the defined-tag namespace
-`Oracle-Tags`:
+`Oracle-Tags`. The parser also accepts the equivalent underscore form
+`Oracle_Tags` (case-insensitively), which is present in some tenancies and tag
+exports. If both namespaces exist, the canonical `Oracle-Tags` namespace takes
+precedence:
 
 - `CreatedOn` is retained verbatim in `created_on_raw`;
 - valid RFC3339 values are normalized to UTC in `created_on_utc`;
@@ -416,8 +419,11 @@ The CSV reports retain their earlier `oracle_created_by`,
 compatibility. They also expose the clearer `created_by_user`,
 `instance_created_by_user`, and `volume_created_by_user` columns. The Markdown
 tables label this value **CreatedBy user**. All values come exclusively from
-`Oracle-Tags.CreatedBy`; the tool does not infer an identity from unrelated
-tags or API metadata.
+`Oracle-Tags.CreatedBy` or its accepted `Oracle_Tags.CreatedBy` equivalent; the
+tool does not infer an identity from unrelated tags or API metadata. For
+example, the value
+`oracleidentitycloudservice/leticia.lopez.fillerat@oracle.com` is preserved
+verbatim in both `oracle_created_by` and `created_by_user`.
 
 OCI's separate API `timeCreated` field is retained as `oci_time_created` but is
 not substituted for a missing `Oracle-Tags.CreatedOn`. This makes the requested
@@ -647,10 +653,10 @@ git clone https://github.com/eugsim1/oci-autonomous-database-inventory-go.git
 cd oci-autonomous-database-inventory-go
 podman build --pull=always \
   --file Containerfile \
-  --tag localhost/oci-adb-inventory:2.4.0 \
+  --tag localhost/oci-adb-inventory:2.4.1 \
   .
-podman image inspect localhost/oci-adb-inventory:2.4.0
-podman run --rm localhost/oci-adb-inventory:2.4.0 --version
+podman image inspect localhost/oci-adb-inventory:2.4.1
+podman run --rm localhost/oci-adb-inventory:2.4.1 --version
 ```
 
 The build host needs HTTPS access to the Go module proxy and both base-image
@@ -702,7 +708,7 @@ Optional variables and arguments:
 ```bash
 OCI_PROFILE=REPORTING \
 OUTPUT_DIR=/srv/oci-inventory/reports \
-APP_IMAGE=localhost/oci-adb-inventory:2.4.0 \
+APP_IMAGE=localhost/oci-adb-inventory:2.4.1 \
 ./scripts/run-podman-api-key.sh \
   --regions eu-frankfurt-1,eu-amsterdam-1 \
   --workers 8
@@ -721,7 +727,7 @@ podman run --rm \
   --env "HOME=$HOME" \
   --volume "$HOME/.oci:$HOME/.oci:ro,Z" \
   --volume "$PWD/reports:/reports:Z" \
-  localhost/oci-adb-inventory:2.4.0 \
+  localhost/oci-adb-inventory:2.4.1 \
   --auth api_key \
   --config-file "$HOME/.oci/config" \
   --profile DEFAULT \
@@ -768,7 +774,7 @@ password. The current recommended registry domain format is
 export OCI_REGION=eu-frankfurt-1
 export OCI_NAMESPACE='<tenancy-namespace>'
 export OCIR_REPOSITORY='oci-adb-inventory'
-export IMAGE_TAG='2.4.0'
+export IMAGE_TAG='2.4.1'
 export IMAGE="ocir.${OCI_REGION}.oci.oraclecloud.com/${OCI_NAMESPACE}/${OCIR_REPOSITORY}:${IMAGE_TAG}"
 read -rsp 'OCIR auth token: ' OCIR_AUTH_TOKEN; echo
 printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
@@ -776,7 +782,7 @@ printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
   --password-stdin \
   "ocir.${OCI_REGION}.oci.oraclecloud.com"
 unset OCIR_AUTH_TOKEN
-podman tag localhost/oci-adb-inventory:2.4.0 "$IMAGE"
+podman tag localhost/oci-adb-inventory:2.4.1 "$IMAGE"
 podman push "$IMAGE"
 podman logout "ocir.${OCI_REGION}.oci.oraclecloud.com"
 ```
@@ -810,7 +816,7 @@ image. OKE uses the dedicated `oke_workload_identity` mode described earlier.
 The same image can be built with Docker when a downstream system requires it:
 
 ```bash
-docker build --pull --file Dockerfile --tag oci-adb-inventory:2.4.0 .
+docker build --pull --file Dockerfile --tag oci-adb-inventory:2.4.1 .
 ```
 
 Podman and Docker are alternative local runtimes; Kubernetes/OKE later pulls the
