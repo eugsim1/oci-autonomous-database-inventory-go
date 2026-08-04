@@ -14,6 +14,7 @@ type OracleTagAudit struct {
 	CreatedOnRaw       string `json:"created_on_raw,omitempty"`
 	CreatedOnUTC       string `json:"created_on_utc,omitempty"`
 	CreatedBy          string `json:"created_by,omitempty"`
+	CreatedByUser      string `json:"created_by_user,omitempty"`
 	AgeDaysAsOfReport  *int64 `json:"age_days_as_of_report,omitempty"`
 	CreatedOnTagStatus string `json:"created_on_tag_status"`
 }
@@ -89,9 +90,11 @@ type ComputeInstanceRecord struct {
 
 func NewOracleTagAudit(definedTags map[string]map[string]interface{}, asOf time.Time) OracleTagAudit {
 	namespace := findTagNamespace(definedTags, oracleTagsNamespace)
+	createdBy := findTagValue(namespace, "CreatedBy")
 	audit := OracleTagAudit{
 		CreatedOnRaw:       findTagValue(namespace, "CreatedOn"),
-		CreatedBy:          findTagValue(namespace, "CreatedBy"),
+		CreatedBy:          createdBy,
+		CreatedByUser:      createdBy,
 		CreatedOnTagStatus: "missing",
 	}
 	if audit.CreatedOnRaw == "" {

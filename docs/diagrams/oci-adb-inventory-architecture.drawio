@@ -48,7 +48,7 @@
         <mxCell id="e15" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#3F7D5A;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Arial;fontSize=12;" edge="1" parent="1" source="writer" target="outputs"><mxGeometry relative="1" as="geometry"/></mxCell>
 
         <mxCell id="legend" value="&lt;b&gt;Scope:&lt;/b&gt; read-only OCI API calls. Search is regional and permission-filtered. Only ATTACHED boot/data volumes are counted. Missing volume details produce an explicit incomplete total and collection error." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8DF;strokeColor=#D6B656;strokeWidth=1;fontFamily=Arial;fontSize=13;align=left;spacingLeft=12;" vertex="1" parent="1"><mxGeometry x="250" y="845" width="1130" height="70" as="geometry"/></mxCell>
-        <mxCell id="footer" value="Editable source: diagrams.net (.drawio) | OCI service topology | Schema v2.1" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=11;fontColor=#77716C;" vertex="1" parent="1"><mxGeometry x="48" y="965" width="900" height="24" as="geometry"/></mxCell>
+        <mxCell id="footer" value="Editable source: diagrams.net (.drawio) | OCI service topology | Schema v2.2" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;fontFamily=Arial;fontSize=11;fontColor=#77716C;" vertex="1" parent="1"><mxGeometry x="48" y="965" width="900" height="24" as="geometry"/></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

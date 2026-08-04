@@ -24,7 +24,8 @@ configuration and exact storage sizes.
 - workload, version, lifecycle, licensing, endpoints, networking, Data Guard,
   access-control, mTLS, tags, and all other fields returned by the pinned SDK.
 - normalized `Oracle-Tags.CreatedOn`, elapsed age in days, and
-  `Oracle-Tags.CreatedBy`, using the same audit rules as Compute.
+  `Oracle-Tags.CreatedBy`, exposed explicitly as `created_by_user` and using the
+  same audit rules as Compute.
 - OCI `timeCreated` plus `nb_created_since`, calculated as complete elapsed
   24-hour periods between that service timestamp and the report timestamp.
 
@@ -40,8 +41,8 @@ configuration and exact storage sizes.
 - per-instance boot, block, and combined attached-storage totals;
 - attachment type, lifecycle, device, read-only/shareable flags, and encryption;
 - `Oracle-Tags.CreatedOn`, `Oracle-Tags.CreatedBy`, normalized UTC creation time,
-  and whole elapsed age in days as of the report timestamp for instances and
-  volumes.
+  explicit instance/volume `created_by_user` columns, and whole elapsed age in
+  days as of the report timestamp for instances and volumes.
 
 If attachment listing fails, or an attachment is found but its detail lookup
 fails, the known attachment is retained where possible, its size is left
@@ -358,7 +359,7 @@ reports/
 
 ### JSON
 
-The JSON report has schema version `2.1`. Each Compute record contains the
+The JSON report has schema version `2.2`. Each Compute record contains the
 complete instance object and nested boot/data volume objects:
 
 ```json
@@ -370,6 +371,7 @@ complete instance object and nested boot/data volume objects:
       "created_on_raw": "2026-07-01T08:30:00Z",
       "created_on_utc": "2026-07-01T08:30:00Z",
       "created_by": "alice@example.com",
+      "created_by_user": "alice@example.com",
       "age_days_as_of_report": 28,
       "created_on_tag_status": "parsed"
     },
@@ -400,9 +402,19 @@ volumes, and block volumes is taken only from the defined-tag namespace
 - valid RFC3339 values are normalized to UTC in `created_on_utc`;
 - `age_days_as_of_report` is the number of complete elapsed 24-hour periods
   between the tag timestamp and the report's `generated_at`;
-- `CreatedBy` is retained verbatim;
+- `CreatedBy` is retained verbatim as `created_by`; the explicit
+  `created_by_user` alias contains the same value and is intended for direct
+  inventory filtering and reporting;
 - `created_on_tag_status` is `parsed`, `missing`, `invalid`, or `unavailable`
   when a volume detail lookup failed.
+
+The CSV reports retain their earlier `oracle_created_by`,
+`instance_oracle_created_by`, and `volume_oracle_created_by` columns for
+compatibility. They also expose the clearer `created_by_user`,
+`instance_created_by_user`, and `volume_created_by_user` columns. The Markdown
+tables label this value **CreatedBy user**. All values come exclusively from
+`Oracle-Tags.CreatedBy`; the tool does not infer an identity from unrelated
+tags or API metadata.
 
 OCI's separate API `timeCreated` field is retained as `oci_time_created` but is
 not substituted for a missing `Oracle-Tags.CreatedOn`. This makes the requested
@@ -625,10 +637,10 @@ git clone https://github.com/eugsim1/oci-autonomous-database-inventory-go.git
 cd oci-autonomous-database-inventory-go
 podman build --pull=always \
   --file Containerfile \
-  --tag localhost/oci-adb-inventory:2.2.0 \
+  --tag localhost/oci-adb-inventory:2.3.0 \
   .
-podman image inspect localhost/oci-adb-inventory:2.2.0
-podman run --rm localhost/oci-adb-inventory:2.2.0 --version
+podman image inspect localhost/oci-adb-inventory:2.3.0
+podman run --rm localhost/oci-adb-inventory:2.3.0 --version
 ```
 
 The build host needs HTTPS access to the Go module proxy and both base-image
@@ -680,7 +692,7 @@ Optional variables and arguments:
 ```bash
 OCI_PROFILE=REPORTING \
 OUTPUT_DIR=/srv/oci-inventory/reports \
-APP_IMAGE=localhost/oci-adb-inventory:2.2.0 \
+APP_IMAGE=localhost/oci-adb-inventory:2.3.0 \
 ./scripts/run-podman-api-key.sh \
   --regions eu-frankfurt-1,eu-amsterdam-1 \
   --workers 8
@@ -699,7 +711,7 @@ podman run --rm \
   --env "HOME=$HOME" \
   --volume "$HOME/.oci:$HOME/.oci:ro,Z" \
   --volume "$PWD/reports:/reports:Z" \
-  localhost/oci-adb-inventory:2.2.0 \
+  localhost/oci-adb-inventory:2.3.0 \
   --auth api_key \
   --config-file "$HOME/.oci/config" \
   --profile DEFAULT \
@@ -746,7 +758,7 @@ password. The current recommended registry domain format is
 export OCI_REGION=eu-frankfurt-1
 export OCI_NAMESPACE='<tenancy-namespace>'
 export OCIR_REPOSITORY='oci-adb-inventory'
-export IMAGE_TAG='2.2.0'
+export IMAGE_TAG='2.3.0'
 export IMAGE="ocir.${OCI_REGION}.oci.oraclecloud.com/${OCI_NAMESPACE}/${OCIR_REPOSITORY}:${IMAGE_TAG}"
 read -rsp 'OCIR auth token: ' OCIR_AUTH_TOKEN; echo
 printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
@@ -754,7 +766,7 @@ printf '%s' "$OCIR_AUTH_TOKEN" | podman login \
   --password-stdin \
   "ocir.${OCI_REGION}.oci.oraclecloud.com"
 unset OCIR_AUTH_TOKEN
-podman tag localhost/oci-adb-inventory:2.2.0 "$IMAGE"
+podman tag localhost/oci-adb-inventory:2.3.0 "$IMAGE"
 podman push "$IMAGE"
 podman logout "ocir.${OCI_REGION}.oci.oraclecloud.com"
 ```
@@ -788,7 +800,7 @@ image. OKE uses the dedicated `oke_workload_identity` mode described earlier.
 The same image can be built with Docker when a downstream system requires it:
 
 ```bash
-docker build --pull --file Dockerfile --tag oci-adb-inventory:2.2.0 .
+docker build --pull --file Dockerfile --tag oci-adb-inventory:2.3.0 .
 ```
 
 Podman and Docker are alternative local runtimes; Kubernetes/OKE later pulls the

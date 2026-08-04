@@ -106,7 +106,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 		"local_data_guard_enabled", "remote_data_guard_enabled", "time_created",
 		"nb_created_since",
 		"oracle_created_on_raw", "oracle_created_on_utc", "age_days_as_of_report",
-		"oracle_created_by", "created_on_tag_status",
+		"oracle_created_by", "created_by_user", "created_on_tag_status",
 	}
 	if err := writer.Write(header); err != nil {
 		return nil, fmt.Errorf("write CSV header: %w", err)
@@ -162,6 +162,7 @@ func marshalDatabaseCSV(report model.Report) ([]byte, error) {
 			s.OracleTags.CreatedOnUTC,
 			int64Pointer(s.OracleTags.AgeDaysAsOfReport),
 			s.OracleTags.CreatedBy,
+			s.OracleTags.CreatedByUser,
 			s.OracleTags.CreatedOnTagStatus,
 		}
 		if err := writer.Write(row); err != nil {
@@ -235,6 +236,7 @@ func marshalComputeCSV(report model.Report) ([]byte, error) {
 		"vcpus", "memory_gbs", "baseline_ocpu_utilization", "instance_oci_time_created",
 		"instance_oracle_created_on_raw", "instance_oracle_created_on_utc",
 		"instance_age_days_as_of_report", "instance_oracle_created_by",
+		"instance_created_by_user",
 		"instance_created_on_tag_status", "boot_volume_count", "attached_block_volume_count",
 		"boot_volume_inventory_complete", "block_volume_inventory_complete",
 		"boot_volume_total_size_gbs", "attached_block_volume_total_size_gbs",
@@ -245,6 +247,7 @@ func marshalComputeCSV(report model.Report) ([]byte, error) {
 		"volume_auto_tuned_vpus_per_gb", "volume_oci_time_created",
 		"volume_oracle_created_on_raw", "volume_oracle_created_on_utc",
 		"volume_age_days_as_of_report", "volume_oracle_created_by",
+		"volume_created_by_user",
 		"volume_created_on_tag_status", "is_read_only", "is_shareable",
 		"pv_encryption_in_transit_enabled",
 	}
@@ -304,6 +307,7 @@ func computeCSVRow(
 		instance.OracleTags.CreatedOnUTC,
 		int64Pointer(instance.OracleTags.AgeDaysAsOfReport),
 		instance.OracleTags.CreatedBy,
+		instance.OracleTags.CreatedByUser,
 		instance.OracleTags.CreatedOnTagStatus,
 		strconv.Itoa(instance.BootVolumeCount),
 		strconv.Itoa(instance.AttachedBlockVolumeCount),
@@ -315,7 +319,7 @@ func computeCSVRow(
 		strconv.FormatBool(instance.AttachedStorageSizeComplete),
 	}
 	if volume == nil {
-		return append(row, make([]string, 21)...)
+		return append(row, make([]string, 22)...)
 	}
 	return append(row,
 		volume.Kind,
@@ -335,6 +339,7 @@ func computeCSVRow(
 		volume.OracleTags.CreatedOnUTC,
 		int64Pointer(volume.OracleTags.AgeDaysAsOfReport),
 		volume.OracleTags.CreatedBy,
+		volume.OracleTags.CreatedByUser,
 		volume.OracleTags.CreatedOnTagStatus,
 		boolPointer(volume.IsReadOnly),
 		boolPointer(volume.IsShareable),
@@ -467,7 +472,7 @@ func marshalMarkdown(
 	fmt.Fprintln(&output)
 	fmt.Fprintln(&output, "## Compute instances")
 	fmt.Fprintln(&output)
-	fmt.Fprintln(&output, "| Region | Instance | State | Shape | OCPUs | Memory (GB) | Oracle-Tags.CreatedOn | Age (days) | Created by | Boot (GB) | Block (GB) | Total (GB) |")
+	fmt.Fprintln(&output, "| Region | Instance | State | Shape | OCPUs | Memory (GB) | Oracle-Tags.CreatedOn | Age (days) | CreatedBy user | Boot (GB) | Block (GB) | Total (GB) |")
 	fmt.Fprintln(&output, "|---|---|---|---|---:|---:|---|---:|---|---:|---:|---:|")
 	for _, record := range report.ComputeInstances {
 		s := record.Summary
@@ -480,7 +485,7 @@ func marshalMarkdown(
 			displayFloat(s.MemoryInGBs),
 			markdownEscape(s.OracleTags.CreatedOnRaw),
 			displayInt64(s.OracleTags.AgeDaysAsOfReport),
-			markdownEscape(s.OracleTags.CreatedBy),
+			markdownEscape(s.OracleTags.CreatedByUser),
 			displayInt64(s.BootVolumeTotalSizeInGBs),
 			displayInt64(s.AttachedBlockVolumeTotalSizeInGBs),
 			displayInt64(s.AttachedStorageTotalSizeInGBs),
@@ -490,7 +495,7 @@ func marshalMarkdown(
 	fmt.Fprintln(&output)
 	fmt.Fprintln(&output, "## Attached Compute storage")
 	fmt.Fprintln(&output)
-	fmt.Fprintln(&output, "| Region | Instance | Kind | Volume | Attachment | Device | Size (GB) | VPUs/GB | Oracle-Tags.CreatedOn | Age (days) | Created by |")
+	fmt.Fprintln(&output, "| Region | Instance | Kind | Volume | Attachment | Device | Size (GB) | VPUs/GB | Oracle-Tags.CreatedOn | Age (days) | CreatedBy user |")
 	fmt.Fprintln(&output, "|---|---|---|---|---|---|---:|---:|---|---:|---|")
 	for _, record := range report.ComputeInstances {
 		for _, volume := range record.BootVolumes {
@@ -504,7 +509,7 @@ func marshalMarkdown(
 	fmt.Fprintln(&output)
 	fmt.Fprintln(&output, "## Autonomous Databases")
 	fmt.Fprintln(&output)
-	fmt.Fprintln(&output, "| Region | Display name | DB name | State | Workload | Model | Compute | ECPUs | OCPUs | Storage | OCI time_created | nb_created_since | Oracle-Tags.CreatedOn | Tag age (days) | Created by |")
+	fmt.Fprintln(&output, "| Region | Display name | DB name | State | Workload | Model | Compute | ECPUs | OCPUs | Storage | OCI time_created | nb_created_since | Oracle-Tags.CreatedOn | Tag age (days) | CreatedBy user |")
 	fmt.Fprintln(&output, "|---|---|---|---|---|---|---:|---:|---:|---:|---|---:|---|---:|---|")
 	for _, record := range report.Databases {
 		s := record.Summary
@@ -523,7 +528,7 @@ func marshalMarkdown(
 			displayInt64(s.NBCreatedSince),
 			markdownEscape(s.OracleTags.CreatedOnRaw),
 			displayInt64(s.OracleTags.AgeDaysAsOfReport),
-			markdownEscape(s.OracleTags.CreatedBy),
+			markdownEscape(s.OracleTags.CreatedByUser),
 		)
 	}
 
@@ -567,7 +572,7 @@ func writeVolumeMarkdownRow(
 		displayInt64(volume.VPUsPerGB),
 		markdownEscape(volume.OracleTags.CreatedOnRaw),
 		displayInt64(volume.OracleTags.AgeDaysAsOfReport),
-		markdownEscape(volume.OracleTags.CreatedBy),
+		markdownEscape(volume.OracleTags.CreatedByUser),
 	)
 }
 

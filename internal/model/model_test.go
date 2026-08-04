@@ -69,6 +69,9 @@ func TestOracleTagAuditUsesCreatedOnAndCreatedBy(t *testing.T) {
 	if got.CreatedBy != "alice@example.com" {
 		t.Fatalf("CreatedBy = %q", got.CreatedBy)
 	}
+	if got.CreatedByUser != "alice@example.com" {
+		t.Fatalf("CreatedByUser = %q", got.CreatedByUser)
+	}
 }
 
 func TestOracleTagAuditReportsInvalidCreatedOn(t *testing.T) {

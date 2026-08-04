@@ -97,6 +97,10 @@ The attachment object and corresponding volume object are both retained.
 The normalizer performs a case-insensitive lookup of the `Oracle-Tags`
 namespace and its `CreatedOn` and `CreatedBy` keys.
 
+`CreatedBy` is preserved as `created_by` and copied to the explicit
+`created_by_user` reporting alias. The CSV reports retain the legacy
+Oracle-prefixed columns and add resource-specific `*_created_by_user` columns.
+
 `CreatedOn` handling:
 
 - preserve the original value;
@@ -140,7 +144,7 @@ The root context applies the configured timeout to the complete operation.
 
 ## 5. Data model
 
-The JSON schema version is `2.1`.
+The JSON schema version is `2.2`.
 
 `Report` contains:
 

@@ -37,7 +37,7 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		},
 	}
 	report := model.Report{
-		SchemaVersion:  "2.1",
+		SchemaVersion:  "2.2",
 		GeneratedAt:    generated,
 		TenancyOCID:    "ocid1.tenancy.oc1..example",
 		Authentication: "api_key",
@@ -76,6 +76,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		Id:          common.String("ocid1.bootvolume.oc1.example"),
 		DisplayName: common.String("app-01 (Boot Volume)"),
 		SizeInGBs:   common.Int64(100),
+		DefinedTags: map[string]map[string]interface{}{
+			"Oracle-Tags": {"CreatedBy": "boot-admin@example.com"},
+		},
 	}, generated)
 	blockAttachment := core.ParavirtualizedVolumeAttachment{
 		Id:             common.String("ocid1.volumeattachment.oc1.example"),
@@ -86,6 +89,9 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		Id:          common.String("ocid1.volume.oc1.example"),
 		DisplayName: common.String("app-data"),
 		SizeInGBs:   common.Int64(250),
+		DefinedTags: map[string]map[string]interface{}{
+			"Oracle-Tags": {"CreatedBy": "storage-admin@example.com"},
+		},
 	}, generated)
 	report.ComputeInstances = []model.ComputeInstanceRecord{
 		model.NewComputeInstanceRecord(
@@ -141,6 +147,11 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	}
 	databases := decoded["databases"].([]interface{})
 	record := databases[0].(map[string]interface{})
+	summary := record["summary"].(map[string]interface{})
+	oracleTags := summary["oracle_tags"].(map[string]interface{})
+	if oracleTags["created_by_user"] != "database-admin@example.com" {
+		t.Fatalf("JSON created_by_user = %v", oracleTags["created_by_user"])
+	}
 	configuration := record["configuration"].(map[string]interface{})
 	if configuration["computeModel"] != "ECPU" {
 		t.Fatalf("full configuration computeModel = %v", configuration["computeModel"])
@@ -170,6 +181,10 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(rows[1], ","), "database-admin@example.com") {
 		t.Fatalf("Autonomous Database CSV does not contain Oracle-Tags.CreatedBy: %#v", rows[1])
+	}
+	createdByUserIndex := columnIndex(rows[0], "created_by_user")
+	if createdByUserIndex == -1 || rows[1][createdByUserIndex] != "database-admin@example.com" {
+		t.Fatalf("Autonomous Database CSV created_by_user is missing or incorrect: %#v", rows[1])
 	}
 	nbCreatedSinceIndex := columnIndex(rows[0], "nb_created_since")
 	if nbCreatedSinceIndex == -1 {
@@ -201,6 +216,16 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		!strings.Contains(strings.Join(computeRows[2], ","), "250") {
 		t.Fatalf("Compute CSV does not contain exact boot and block volume sizes: %#v", computeRows)
 	}
+	instanceCreatedByUserIndex := columnIndex(computeRows[0], "instance_created_by_user")
+	if instanceCreatedByUserIndex == -1 || computeRows[1][instanceCreatedByUserIndex] != "alice@example.com" {
+		t.Fatalf("Compute CSV instance_created_by_user is missing or incorrect: %#v", computeRows[1])
+	}
+	volumeCreatedByUserIndex := columnIndex(computeRows[0], "volume_created_by_user")
+	if volumeCreatedByUserIndex == -1 ||
+		computeRows[1][volumeCreatedByUserIndex] != "boot-admin@example.com" ||
+		computeRows[2][volumeCreatedByUserIndex] != "storage-admin@example.com" {
+		t.Fatalf("Compute CSV volume_created_by_user values are missing or incorrect: %#v", computeRows)
+	}
 
 	failedCSVFile, err := os.Open(paths.FailedRequestsCSV)
 	if err != nil {
@@ -220,6 +245,7 @@ func TestWriteProducesTimestampedReports(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(markdown), "nb_created_since") ||
+		!strings.Contains(string(markdown), "CreatedBy user") ||
 		!strings.Contains(string(markdown), filepath.Base(paths.FailedRequestsCSV)) {
 		t.Fatalf("Markdown does not document age and failed-request outputs: %s", markdown)
 	}

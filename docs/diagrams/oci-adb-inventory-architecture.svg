@@ -118,5 +118,5 @@
   <rect x="235" y="828" width="1130" height="74" rx="9" fill="#fff8df" stroke="#d6b656"/>
   <text x="260" y="858" class="h">Scope and accuracy contract</text>
   <text x="260" y="883" class="t">Read-only calls. Search is regional and permission-filtered. Missing volume details retain the attachment, leave size unknown, and mark totals incomplete.</text>
-  <text x="48" y="958" class="small">Editable source: diagrams.net (.drawio) | OCI service topology | Report schema v2.1</text>
+  <text x="48" y="958" class="small">Editable source: diagrams.net (.drawio) | OCI service topology | Report schema v2.2</text>
 </svg>
